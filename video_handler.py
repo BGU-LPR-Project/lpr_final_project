@@ -16,13 +16,16 @@ class VideoHandler:
         if not self.capture.isOpened():
             raise FileNotFoundError(f"Unable to open video file: {self.video_path}")
 
-    def decode_frame(self):
+    def decode_frame(self, skip_frames: int = 0):
         """
-        Decode a single frame from the video. Returns None if no frame is available.
+        Decode a single frame from the video, skipping a given number of frames.
         """
         if self.capture is None:
             raise ValueError("Video capture not initialized. Call load_video() first.")
-        
+
+        for _ in range(skip_frames):
+            self.capture.grab()  # Skip frames without decoding them
+
         ret, frame = self.capture.read()
         if not ret:
             return None

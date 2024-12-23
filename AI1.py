@@ -11,65 +11,107 @@ class BoundingBox:
         self.height = height
         self.confidence = confidence
 
-    def intersects_with(self, other_box: 'BoundingBox') -> bool:
-        """
-        Check if this box intersects with another.
-        """
+    def intersects_with(self, other: 'BoundingBox') -> bool:
         return not (
-            self.x + self.width < other_box.x or
-            self.x > other_box.x + other_box.width or
-            self.y + self.height < other_box.y or
-            self.y > other_box.y + other_box.height
+            self.x + self.width < other.x or
+            self.x > other.x + other.width or
+            self.y + self.height < other.y or
+            self.y > other.y + other.height
         )
 
-    def area(self) -> int:
-        return self.width * self.height
+    def merge_with(self, other: 'BoundingBox') -> 'BoundingBox':
+        new_x = min(self.x, other.x)
+        new_y = min(self.y, other.y)
+        new_w = max(self.x + self.width, other.x + other.width) - new_x
+        new_h = max(self.y + self.height, other.y + other.height) - new_y
+        return BoundingBox(new_x, new_y, new_w, new_h, max(self.confidence, other.confidence))
 
 class MotionDetector:
     def __init__(self):
-        """
-        Initialize the MotionDetector class
-        """
-        self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=16, detectShadows=False)
+        self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=30, detectShadows=True)
+        self.prev_frame = None
 
     def detect_motion(self, frame: np.ndarray) -> List[BoundingBox]:
-        """
-        Detects moving objects in the given frame.
-        
-        Args:
-            frame (np.ndarray): The input frame (BGR image).
-            
-        Returns:
-            List[BoundingBox]: List of bounding boxes for detected motion regions.
-        """
-        # Apply the background subtractor to get the foreground mask
-        fg_mask = self.bg_subtractor.apply(frame)
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        if self.prev_frame is None:
+            self.prev_frame = gray
+            return []
 
-        # Optionally remove noise from the foreground mask
-        fg_mask = cv2.medianBlur(fg_mask, 5)
+        flow = cv2.calcOpticalFlowFarneback(
+            self.prev_frame, gray, None,
+            pyr_scale=0.5, levels=3, winsize=15,
+            iterations=3, poly_n=5, poly_sigma=1.1, flags=0
+        )
+        mag, _ = cv2.cartToPolar(flow[..., 0], flow[..., 1])
+        motion_mask = cv2.threshold(mag, 2, 255, cv2.THRESH_BINARY)[1]
 
-        # Clean the mask using morphological operations
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-        fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_OPEN, kernel)
-
-        # Find contours in the foreground mask
-        contours, _ = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
+        contours, _ = cv2.findContours(motion_mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         bounding_boxes = []
         for contour in contours:
-            # Filter small contours based on area
-            if cv2.contourArea(contour) < 900:  # Threshold to ignore small movements
-                continue
+            if cv2.contourArea(contour) > 2500:  # Filter by area
+                x, y, w, h = cv2.boundingRect(contour)
+                bounding_boxes.append(BoundingBox(x, y, w, h))
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 255), 2)  # Draw yellow box
 
-            # Get the bounding box for each valid contour
-            x, y, w, h = cv2.boundingRect(contour)
-            bounding_boxes.append(BoundingBox(x, y, w, h))
+        self.prev_frame = gray
+        # Step 1: Merge boxes
+        merged_boxes = self.merge_boxes(bounding_boxes)
+        # Step 2: Filter by aspect ratio
+        filtered_boxes = self.filter_by_aspect_ratio(merged_boxes, min_ratio=1.2, max_ratio=5.0)
 
-            # Draw bounding box for the movement
-            # cv2.rectangle(frame, (int(x), int(y)), (int(x+w), int(y+h)), (0, 255, 255), 1)
+        return filtered_boxes
 
-        return bounding_boxes
-    
+    def merge_boxes(self, boxes: List[BoundingBox]) -> List[BoundingBox]:
+        if not boxes:
+            return []
+        boxes.sort(key=lambda b: (b.y, b.x))
+        merged = [boxes[0]]
+        for current in boxes[1:]:
+            last = merged[-1]
+            if self.should_merge(last, current):
+                merged[-1] = last.merge_with(current)
+            else:
+                merged.append(current)
+        return merged
+
+    def should_merge(self, box1: BoundingBox, box2: BoundingBox) -> bool:
+        threshold = min(box1.width, box1.height, box2.width, box2.height) / 4
+        close_in_x = abs(box1.x + box1.width / 2 - (box2.x + box2.width / 2)) < threshold
+        close_in_y = abs(box1.y + box1.height / 2 - (box2.y + box2.height / 2)) < threshold
+        return close_in_x and close_in_y and self.intersect_over_union(box1, box2) < 0.5
+
+    def intersect_over_union(self, box1: BoundingBox, box2: BoundingBox):
+        inter_x1 = max(box1.x, box2.x)
+        inter_y1 = max(box1.y, box2.y)
+        inter_x2 = min(box1.x + box1.width, box2.x + box2.width)
+        inter_y2 = min(box1.y + box1.height, box2.y + box2.height)
+        inter_area = max(0, inter_x2 - inter_x1) * max(0, inter_y2 - inter_y1)
+        box1_area = box1.width * box1.height
+        box2_area = box2.width * box2.height
+        union_area = box1_area + box2_area - inter_area
+        return inter_area / union_area if union_area > 0 else 0
+
+    def filter_by_aspect_ratio(self, boxes: List[BoundingBox], min_ratio: float, max_ratio: float) -> List[BoundingBox]:
+        """
+        Filter bounding boxes by aspect ratio.
+        Args:
+            boxes (List[BoundingBox]): List of bounding boxes to filter.
+            min_ratio (float): Minimum aspect ratio (width/height) for a valid box.
+            max_ratio (float): Maximum aspect ratio (width/height) for a valid box.
+
+        Returns:
+            List[BoundingBox]: Filtered bounding boxes.
+        """
+        return [box for box in boxes if min_ratio <= box.width / float(box.height) <= max_ratio]
+
+
+
+
+
+
+
+
+
 
 class CarDetector:
     def __init__(self, model_path: str, confidence_threshold: float = 0.0):
@@ -118,10 +160,10 @@ class CarDetector:
                         moving_cars.append(detected_car_box)
 
                         # Draw bounding box for the moving car
-                        # cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 1)
-                        # plate_label = f"car: {confidence:.2f}"
-                        # cv2.putText(frame, plate_label, (int(x1), int(y1) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                        cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 1)
+                        plate_label = f"car: {confidence:.2f}"
+                        cv2.putText(frame, plate_label, (int(x1), int(y1) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
                         continue
-                       
+
         return moving_cars

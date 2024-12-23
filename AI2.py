@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from typing import List
 from ultralytics import YOLO
-import pytesseract
+import torch
 from AI1 import BoundingBox
 import easyocr
 
