@@ -4,7 +4,7 @@ from typing import List
 from ultralytics import YOLO
 import torch
 from AI1 import BoundingBox
-import easyocr
+import paddleocr
 
 class LicensePlateDetector:
 
@@ -18,7 +18,7 @@ class LicensePlateDetector:
         """
         self.model = YOLO(model_path)
         self.confidence_threshold = confidence_threshold
-        self.reader = easyocr.Reader(['en'], gpu=True)
+        self.reader = paddleocr.PaddleOCR(use_angle_cls=True, lang='en')
        
     def detect_license_plates(self, frame: np.ndarray, detected_cars: List[BoundingBox]):
         """
@@ -70,46 +70,46 @@ class LicensePlateDetector:
                         cv2.putText(frame, plate_label, (int(x1), int(y1) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
 
 
-
-    def read_text_from_plate(self, cropped_plate: np.ndarray):
+    def read_text_from_plate(self, cropped_plate: np.ndarray) -> str:
         """
-        Read text from the cropped license plate using OCR.
+        Read text from the cropped license plate using OCR, with filtering for irrelevant areas.
 
         Args:
             cropped_plate (np.ndarray): Cropped image of the license plate.
 
-        Actions:
-            - Preprocess the cropped license plate for better OCR results.
-            - Use Tesseract OCR to extract text from the image.
-            - Display the processed license plate and extracted text.
+        Returns:
+            str: Validated license plate text.
         """
+        # Resize for consistency
+        resized = cv2.resize(cropped_plate.copy(), (300, 100), interpolation=cv2.INTER_CUBIC)
 
-        # Adjust size based on typical license plate proportions
-        license_plate_crop_resized = cv2.resize(cropped_plate.copy(), (300, 100))  
+        # Convert to grayscale and preprocess
+        gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
+        blurred = cv2.GaussianBlur(gray,(5,5), 0)
+
+        # Adaptive thresholding
+        _, otsu_thresh = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+
+        # Apply a mask to focus on the central region
+        h, w = otsu_thresh.shape
+        mask = np.zeros((h, w), dtype=np.uint8)
+        cv2.rectangle(mask, (int(0.1 * w), int(0.2 * h)), (int(0.9 * w), int(0.8 * h)), 255, -1)
+        masked_plate = cv2.bitwise_and(otsu_thresh, otsu_thresh, mask=mask)
         
-        # Preprocess the cropped plate
-        license_plate_crop_gray = cv2.cvtColor(license_plate_crop_resized, cv2.COLOR_BGR2GRAY)
-        license_plate_crop_blurred = cv2.GaussianBlur(license_plate_crop_gray, (5, 5), 0)
-        license_plate_crop_thres = cv2.adaptiveThreshold(license_plate_crop_blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2)     
-
-        cv2.imshow("processed plate", license_plate_crop_blurred)   
-
-        # Use OCR model to read license plate
+        cv2.imshow("plate", blurred)
+        # Use OCR
         try:
-            return self.reader.readtext(license_plate_crop_thres, detail=0)
-            #return pytesseract.image_to_string(license_plate_crop_blurred, lang='eng', config='--psm 6').strip()
-            # results = pytesseract.image_to_data(license_plate_crop_gray, lang='eng', config='--psm 6', output_type=pytesseract.Output.DATAFRAME)
+            results = self.reader.ocr(blurred)
+            # Set a confidence threshold (e.g., 0.8)
+            confidence_threshold = 0.8
+
+            # Extract text with high confidence
+            high_confidence_results = [
+                line[1][0] for line in results[0] if line[1][1] >= confidence_threshold
+            ]
             
-            # # Filter out weak confidence text localizations
-            # filtered_results = results[results['conf'] > 0]
+            return high_confidence_results
 
-            # for _, row in filtered_results.iterrows():
-            #     text = row['text']
-            #     conf = row['conf']
-                
-            #     print(f"Confidence: {conf}")
-            #     print(f"Text: {text}")
-
-                # print(f"License Plate detected: {predicted_result}")
         except Exception as e:
-            print(f"An error occurred: {e}")
+            print(f"Error dur")

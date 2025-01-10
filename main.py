@@ -33,6 +33,6 @@ class LPRPipeline:
             cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    video_path = "recordings\\videoplayback.mp4"
+    video_path = "recordings\\motion4.mp4"
     pipeline = LPRPipeline(video_path)
     pipeline.run()

@@ -1,0 +1,39 @@
+[
+    {
+        "content": [
+            {
+                "x": 210.5,
+                "y": 3.5
+            },
+            {
+                "x": 252.5,
+                "y": 3.5
+            },
+            {
+                "x": 252.5,
+                "y": 29.5
+            },
+            {
+                "x": 210.5,
+                "y": 29.5
+            }
+        ],
+        "rectMask": {
+            "xMin": 210.5,
+            "yMin": 3.5,
+            "width": 42,
+            "height": 26
+        },
+        "labels": {
+            "labelName": "motion",
+            "labelColor": "#ffff00",
+            "labelColorRGB": "255,255,0",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 231.5,
+            "y": 16.5
+        },
+        "contentType": "rect"
+    }
+]

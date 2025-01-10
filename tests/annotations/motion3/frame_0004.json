@@ -1,0 +1,39 @@
+[
+    {
+        "content": [
+            {
+                "x": 211.5,
+                "y": 2.5
+            },
+            {
+                "x": 264.5,
+                "y": 2.5
+            },
+            {
+                "x": 264.5,
+                "y": 25.5
+            },
+            {
+                "x": 211.5,
+                "y": 25.5
+            }
+        ],
+        "rectMask": {
+            "xMin": 211.5,
+            "yMin": 2.5,
+            "width": 53,
+            "height": 23
+        },
+        "labels": {
+            "labelName": "unnamed",
+            "labelColor": "red",
+            "labelColorRGB": "255,0,0",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 238,
+            "y": 14
+        },
+        "contentType": "rect"
+    }
+]
