@@ -51,15 +51,16 @@ class MotionDetector:
             if cv2.contourArea(contour) > 2500:  # Filter by area
                 x, y, w, h = cv2.boundingRect(contour)
                 bounding_boxes.append(BoundingBox(x, y, w, h))
-                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 255), 2)  # Draw yellow box
 
         self.prev_frame = gray
-        # Step 1: Merge boxes
+        
         merged_boxes = self.merge_boxes(bounding_boxes)
-        # Step 2: Filter by aspect ratio
-        filtered_boxes = self.filter_by_aspect_ratio(merged_boxes, min_ratio=1.2, max_ratio=5.0)
 
-        return filtered_boxes
+        for box in merged_boxes:
+            # Draw bounding box for the movement
+            cv2.rectangle(frame, (box.x, box.y), (box.x + box.width, box.y + box.height), (0, 255, 255), 1)
+
+        return merged_boxes
 
     def merge_boxes(self, boxes: List[BoundingBox]) -> List[BoundingBox]:
         if not boxes:
@@ -75,10 +76,14 @@ class MotionDetector:
         return merged
 
     def should_merge(self, box1: BoundingBox, box2: BoundingBox) -> bool:
+        # If no intersection, check closeness
         threshold = min(box1.width, box1.height, box2.width, box2.height) / 4
         close_in_x = abs(box1.x + box1.width / 2 - (box2.x + box2.width / 2)) < threshold
         close_in_y = abs(box1.y + box1.height / 2 - (box2.y + box2.height / 2)) < threshold
-        return close_in_x and close_in_y and self.intersect_over_union(box1, box2) < 0.5
+
+        # Use IoU as an additional condition
+        return box1.intersects_with(box2) or (close_in_x and close_in_y and self.intersect_over_union(box1, box2) < 0.7)
+
 
     def intersect_over_union(self, box1: BoundingBox, box2: BoundingBox):
         inter_x1 = max(box1.x, box2.x)
@@ -90,26 +95,6 @@ class MotionDetector:
         box2_area = box2.width * box2.height
         union_area = box1_area + box2_area - inter_area
         return inter_area / union_area if union_area > 0 else 0
-
-    def filter_by_aspect_ratio(self, boxes: List[BoundingBox], min_ratio: float, max_ratio: float) -> List[BoundingBox]:
-        """
-        Filter bounding boxes by aspect ratio.
-        Args:
-            boxes (List[BoundingBox]): List of bounding boxes to filter.
-            min_ratio (float): Minimum aspect ratio (width/height) for a valid box.
-            max_ratio (float): Maximum aspect ratio (width/height) for a valid box.
-
-        Returns:
-            List[BoundingBox]: Filtered bounding boxes.
-        """
-        return [box for box in boxes if min_ratio <= box.width / float(box.height) <= max_ratio]
-
-
-
-
-
-
-
 
 
 
