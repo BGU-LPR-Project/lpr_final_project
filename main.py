@@ -2,8 +2,8 @@ from typing import Optional
 import cv2
 import numpy as np
 from video_handler import VideoHandler
-from AI1 import *
-from AI2 import *
+from lpr_final_project.Edge import *
+from lpr_final_project.Cloud import *
 
 class LPRPipeline:
     def __init__(self, video_path: str):
