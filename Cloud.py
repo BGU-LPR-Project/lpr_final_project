@@ -3,7 +3,7 @@ import numpy as np
 from typing import List
 from ultralytics import YOLO
 import torch
-from AI1 import BoundingBox
+from lpr_final_project.Edge import BoundingBox
 import paddleocr
 
 class LicensePlateDetector:

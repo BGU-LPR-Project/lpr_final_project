@@ -6,7 +6,7 @@ import sys
 # Dynamically add the project root directory to sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from AI1 import MotionDetector
+from lpr_final_project.Edge import MotionDetector
 
 def test_motion_detection_with_annotations(model, frames_path, annotations_path):
     # Get all frame filenames
