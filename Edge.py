@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
 from typing import List
-from ultralytics import YOLO
 
 class BoundingBox:
     def __init__(self, x: int, y: int, width: int, height: int, confidence: float = 1.0):
@@ -31,7 +30,7 @@ class MotionDetector:
         self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=30, detectShadows=True)
         self.prev_frame = None
 
-    def detect_motion(self, frame: np.ndarray) -> List[BoundingBox]:
+    def detect_motion(self, visualize_frame: np.ndarray, frame: np.ndarray) -> List[BoundingBox]:
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         if self.prev_frame is None:
             self.prev_frame = gray
@@ -55,11 +54,7 @@ class MotionDetector:
         self.prev_frame = gray
         
         merged_boxes = self.merge_boxes(bounding_boxes)
-
-        for box in merged_boxes:
-            # Draw bounding box for the movement
-            cv2.rectangle(frame, (box.x, box.y), (box.x + box.width, box.y + box.height), (0, 255, 255), 1)
-
+        
         return merged_boxes
 
     def merge_boxes(self, boxes: List[BoundingBox]) -> List[BoundingBox]:
