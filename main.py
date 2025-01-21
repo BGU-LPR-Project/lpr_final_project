@@ -40,7 +40,13 @@ class LPRPipeline:
 
                 motion_boxes = self.motion_detector.detect_motion(frame, roi_masked)
                 detected_cars = self.car_detector.detect_moving_cars(frame, roi_masked, motion_boxes)
-                self.license_plate_detector.detect_license_plates(frame, roi_masked, detected_cars)
+                detections = self.license_plate_detector.detect_license_plates(frame, roi_masked, detected_cars)
+
+                # Go over the detections
+                for object_id, data in detections.items():
+                    plate_number = data["plate_number"]
+                    authorized = False # TODO: Call Whitelist component to check plate_number
+                    self.visualize(frame, object_id, data, authorized)
 
                 cv2.imshow("LPR-Control", control_frame)
                 cv2.imshow("LPR-Main", frame)
@@ -52,6 +58,26 @@ class LPRPipeline:
         finally:
             self.video_processor.release_resources()
             cv2.destroyAllWindows()
+
+    def visualize(self, frame: np.ndarray, object_id: int, data, authorized: bool):
+        centroid = data["centroid"]
+        bbox = data["bbox"]
+        plate_number = data["plate_number"]
+
+        box_color = (0, 255, 0) if authorized else (0, 0, 255)
+
+        # Draw the bounding box and centroid
+        x1, y1, x2, y2 = bbox
+        cv2.rectangle(frame, (x1, y1), (x2, y2), box_color, 2)
+        cv2.circle(frame, tuple(centroid), 5, box_color, -1)
+        text = f"ID {object_id}"
+        cv2.putText(frame, text, (centroid[0] - 10, centroid[1] - 10),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.5, box_color, 2)
+
+        # Optionally display the plate number if available
+        if plate_number:
+            cv2.putText(frame, f"Plate: {plate_number}", (x1, y1 - 10),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
 
 if __name__ == "__main__":
     video_path = "recordings\\motion4.mp4"

@@ -52,8 +52,11 @@ class CarDetector:
             x1, y1, x2, y2 = map(int, box.xyxy[0])
             detected_car_box = BoundingBox(x1, y1, x2 - x1, y2 - y1, confidence)
 
+            # Class ID 2 is 'car', Class ID 3 is 'motorcycle', Class ID 5 is 'bus', Class ID 7 is 'truck' 
+            is_object_of_interest = (class_id == 2 or class_id == 3 or class_id == 5 or class_id == 7)
+
             # Check if the detected car overlaps with any motion detection
-            if confidence > self.confidence_threshold and class_id == 2:  # Class ID 2 is 'car'
+            if confidence > self.confidence_threshold and is_object_of_interest:
                 for motion_box in motion_bounding_boxes:
                     if detected_car_box.intersects_with(motion_box):
                         moving_cars.append(detected_car_box)
@@ -105,27 +108,11 @@ class LicensePlateDetector:
                     cropped_plate = frame[int(y1):int(y2), int(x1):int(x2)]
                     ocr_text, ocr_confidence = self.read_text_from_plate(cropped_plate)
                     processed_text = self.process_plate(ocr_text) if ocr_text is not None else None
-                    if (processed_text is not None) and (ocr_confidence > current_plate_confidence): 
+                    if (processed_text is not None): 
                         car_details['plate_number'] = processed_text
                         car_details["confidence"] = ocr_confidence
 
-        for object_id, data in detected_cars.items():
-            centroid = data["centroid"]
-            bbox = data["bbox"]
-            plate_number = data["plate_number"]
-
-            # Draw the bounding box and centroid
-            x1, y1, x2, y2 = bbox
-            cv2.rectangle(visualize_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.circle(visualize_frame, tuple(centroid), 5, (0, 255, 0), -1)
-            text = f"ID {object_id}"
-            cv2.putText(visualize_frame, text, (centroid[0] - 10, centroid[1] - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-            # Optionally display the plate number if available
-            if plate_number:
-                cv2.putText(visualize_frame, f"Plate: {plate_number}", (x1, y1 - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+        return detected_cars
 
     def match_plate_to_car(self, plate_box: BoundingBox, detected_cars: OrderedDict) -> int:
         """
@@ -216,6 +203,10 @@ class LicensePlateDetector:
             selected_result = None
             selected_confidence = 0.0
 
+            # Check if results is None
+            if not results or results[0] is None:
+                return None, 0.0
+            
             # Extract text with high confidence
             high_confidence_results = [
                 (line[1][0], line[1][1]) for line in results[0] if line[1][1] >= confidence_threshold
