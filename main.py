@@ -35,7 +35,8 @@ class LPRPipeline:
 
                 control_frame = region_adjuster.draw_overlay(frame)  # Apply transparent red overlay
                 region_adjuster.draw_boundary(control_frame)  # Draw the line and endpoints
-
+                region_adjuster.draw_labels(control_frame)
+                
                 roi_masked = region_adjuster.apply_roi_mask(frame)
 
                 motion_boxes = self.motion_detector.detect_motion(frame, roi_masked)
