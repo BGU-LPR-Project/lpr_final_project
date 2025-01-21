@@ -109,23 +109,7 @@ class LicensePlateDetector:
                         car_details['plate_number'] = processed_text
                         car_details["confidence"] = ocr_confidence
 
-        for object_id, data in detected_cars.items():
-            centroid = data["centroid"]
-            bbox = data["bbox"]
-            plate_number = data["plate_number"]
-
-            # Draw the bounding box and centroid
-            x1, y1, x2, y2 = bbox
-            cv2.rectangle(visualize_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.circle(visualize_frame, tuple(centroid), 5, (0, 255, 0), -1)
-            text = f"ID {object_id}"
-            cv2.putText(visualize_frame, text, (centroid[0] - 10, centroid[1] - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-            # Optionally display the plate number if available
-            if plate_number:
-                cv2.putText(visualize_frame, f"Plate: {plate_number}", (x1, y1 - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+        return detected_cars
 
     def match_plate_to_car(self, plate_box: BoundingBox, detected_cars: OrderedDict) -> int:
         """
