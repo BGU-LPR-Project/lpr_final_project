@@ -1,8 +1,26 @@
+from typing import Optional, Dict
 import cv2
+from datetime import datetime
 from video_handler import VideoHandler
 from edge import *
 from cloud import *
 from roi import RegionAdjuster
+
+class LicensePlate:
+    """
+    Represents a license plate instance.
+    """
+    def __init__(self, plate_number: str):
+        self.plate_number = plate_number
+        self.first_time_seen = datetime.now()
+        self.last_time_seen = datetime.now()
+        # self.perimeter = perimeter
+
+    def update_last_seen(self):
+        """
+        Updates the last time the license plate was seen.
+        """
+        self.last_time_seen = datetime.now()
 
 class LPRPipeline:
     def __init__(self, video_path: str):
@@ -10,8 +28,17 @@ class LPRPipeline:
         self.motion_detector = MotionDetector()  # Make sure it uses the updated MotionDetector
         self.car_detector = CarDetector("yolo11n.pt")
         self.license_plate_detector = LicensePlateDetector("license_plate_detector.pt", [
-            r'[A-Z]{2}[0-9]{2}[A-Z]{3}'
+            r'[A-Z]{2}[0-9]{2}[A-Z]{3}',
+            r'[A-Z]{2}[0-9]{2}[A-Z]{1,2}[0-9]{4}',
+            r'[А-Я]{1,2}[0-9]{3}[А-Я]{1,2}[0-9]{2,3}',
+            r'[1-9A-Z]{2}[A-Z0-9]*[-]{1}[0-9]{4}',
+            r'[A-Z]{1,2}[0-9]{3}[A-Z]{1,2}[0-9]{2,3}', 
+            r'[А-Я]{1}[0-9]{3}[А-Я]{2}[0-9]{2}',
+            r'[1-9A-Z]{1}[A-Z]{3}[0-9]{3}',
+            r'[1-9A-Z]{1}[A-Z]{5}',
+            r'^[1-9][A-Z]{3}[0-9]{3}$', #California License Plate
         ])
+        self.license_plate_table: Dict[str, LicensePlate] = {}  # Hash table for license plates
 
     def run(self):
         # Create a blank frame for demonstration
@@ -46,9 +73,18 @@ class LPRPipeline:
                 # Go over the detections
                 for object_id, data in detections.items():
                     plate_number = data["plate_number"]
-                    authorized = False # TODO: Call Whitelist component to check plate_number
+                    if plate_number in self.license_plate_table:
+                            # Update existing license plate instance
+                            self.license_plate_table[plate_number].update_last_seen()
+                            print(f"Updated: {plate_number} | Last seen: {self.license_plate_table[plate_number].last_time_seen}")
+                    else:
+                        # Create a new license plate instance
+                        self.license_plate_table[plate_number] = LicensePlate(plate_number)
+                        print(f"New plate: {plate_number} | First seen: {self.license_plate_table[plate_number].first_time_seen}")
+                    authorized = False #TODO: Call Whitelist component to check plate_number
                     self.visualize(frame, object_id, data, authorized)
 
+                # Display the processed frame
                 cv2.imshow("LPR-Control", control_frame)
                 cv2.imshow("LPR-Main", frame)
 
@@ -84,3 +120,7 @@ if __name__ == "__main__":
     video_path = "recordings\\motion4.mp4"
     pipeline = LPRPipeline(video_path)
     pipeline.run()
+
+    print("\nSummary of all detected license plates:")
+    for plate_number, plate_data in pipeline.license_plate_table.items():
+        print(f"Plate: {plate_number} | First seen: {plate_data.first_time_seen} | Last seen: {plate_data.last_time_seen}")
