@@ -54,7 +54,7 @@ class LPRPipeline:
             self.video_processor.load_video()
 
             while True:
-                frame = self.video_processor.decode_frame(skip_frames=1)
+                frame = self.video_processor.decode_frame(skip_frames=2)
                 if frame is None:
                     break
 
