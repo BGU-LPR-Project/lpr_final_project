@@ -1,0 +1,150 @@
+[
+    {
+        "content": [
+            {
+                "x": 471,
+                "y": 312.5
+            },
+            {
+                "x": 596,
+                "y": 312.5
+            },
+            {
+                "x": 596,
+                "y": 416.5
+            },
+            {
+                "x": 471,
+                "y": 416.5
+            }
+        ],
+        "rectMask": {
+            "xMin": 471,
+            "yMin": 312.5,
+            "width": 125,
+            "height": 104
+        },
+        "labels": {
+            "labelName": "unnamed",
+            "labelColor": "red",
+            "labelColorRGB": "255,0,0",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 533.5,
+            "y": 364.5
+        },
+        "contentType": "rect"
+    },
+    {
+        "content": [
+            {
+                "x": 569,
+                "y": 340.5
+            },
+            {
+                "x": 689,
+                "y": 340.5
+            },
+            {
+                "x": 689,
+                "y": 441.5
+            },
+            {
+                "x": 569,
+                "y": 441.5
+            }
+        ],
+        "rectMask": {
+            "xMin": 569,
+            "yMin": 340.5,
+            "width": 120,
+            "height": 101
+        },
+        "labels": {
+            "labelName": "unnamed",
+            "labelColor": "red",
+            "labelColorRGB": "255,0,0",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 629,
+            "y": 391
+        },
+        "contentType": "rect"
+    },
+    {
+        "content": [
+            {
+                "x": 720,
+                "y": 324.5
+            },
+            {
+                "x": 804,
+                "y": 324.5
+            },
+            {
+                "x": 804,
+                "y": 412.5
+            },
+            {
+                "x": 720,
+                "y": 412.5
+            }
+        ],
+        "rectMask": {
+            "xMin": 720,
+            "yMin": 324.5,
+            "width": 84,
+            "height": 88
+        },
+        "labels": {
+            "labelName": "unnamed",
+            "labelColor": "red",
+            "labelColorRGB": "255,0,0",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 762,
+            "y": 368.5
+        },
+        "contentType": "rect"
+    },
+    {
+        "content": [
+            {
+                "x": 807,
+                "y": 356.5
+            },
+            {
+                "x": 898,
+                "y": 356.5
+            },
+            {
+                "x": 898,
+                "y": 432.5
+            },
+            {
+                "x": 807,
+                "y": 432.5
+            }
+        ],
+        "rectMask": {
+            "xMin": 807,
+            "yMin": 356.5,
+            "width": 91,
+            "height": 76
+        },
+        "labels": {
+            "labelName": "unnamed",
+            "labelColor": "red",
+            "labelColorRGB": "255,0,0",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 852.5,
+            "y": 394.5
+        },
+        "contentType": "rect"
+    }
+]

@@ -1,0 +1,187 @@
+[
+    {
+        "content": [
+            {
+                "x": 386,
+                "y": 354.5
+            },
+            {
+                "x": 488,
+                "y": 354.5
+            },
+            {
+                "x": 488,
+                "y": 433.5
+            },
+            {
+                "x": 386,
+                "y": 433.5
+            }
+        ],
+        "rectMask": {
+            "xMin": 386,
+            "yMin": 354.5,
+            "width": 102,
+            "height": 79
+        },
+        "labels": {
+            "labelName": "car",
+            "labelColor": "#ff0000",
+            "labelColorRGB": "255,0,0",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 437,
+            "y": 394
+        },
+        "contentType": "rect"
+    },
+    {
+        "content": [
+            {
+                "x": 541,
+                "y": 349.5
+            },
+            {
+                "x": 647,
+                "y": 349.5
+            },
+            {
+                "x": 647,
+                "y": 430.5
+            },
+            {
+                "x": 541,
+                "y": 430.5
+            }
+        ],
+        "rectMask": {
+            "xMin": 541,
+            "yMin": 349.5,
+            "width": 106,
+            "height": 81
+        },
+        "labels": {
+            "labelName": "car",
+            "labelColor": "#ff0000",
+            "labelColorRGB": "255,0,0",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 594,
+            "y": 390
+        },
+        "contentType": "rect"
+    },
+    {
+        "content": [
+            {
+                "x": 838,
+                "y": 300.5
+            },
+            {
+                "x": 960,
+                "y": 300.5
+            },
+            {
+                "x": 960,
+                "y": 457.5
+            },
+            {
+                "x": 838,
+                "y": 457.5
+            }
+        ],
+        "rectMask": {
+            "xMin": 838,
+            "yMin": 300.5,
+            "width": 122,
+            "height": 157
+        },
+        "labels": {
+            "labelName": "car",
+            "labelColor": "#ff0000",
+            "labelColorRGB": "255,0,0",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 899,
+            "y": 379
+        },
+        "contentType": "rect"
+    },
+    {
+        "content": [
+            {
+                "x": 777,
+                "y": 366.5
+            },
+            {
+                "x": 842,
+                "y": 366.5
+            },
+            {
+                "x": 842,
+                "y": 418.5
+            },
+            {
+                "x": 777,
+                "y": 418.5
+            }
+        ],
+        "rectMask": {
+            "xMin": 777,
+            "yMin": 366.5,
+            "width": 65,
+            "height": 52
+        },
+        "labels": {
+            "labelName": "car",
+            "labelColor": "#ff0000",
+            "labelColorRGB": "255,0,0",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 809.5,
+            "y": 392.5
+        },
+        "contentType": "rect"
+    },
+    {
+        "content": [
+            {
+                "x": 701,
+                "y": 312.5
+            },
+            {
+                "x": 849,
+                "y": 312.5
+            },
+            {
+                "x": 849,
+                "y": 405.5
+            },
+            {
+                "x": 701,
+                "y": 405.5
+            }
+        ],
+        "rectMask": {
+            "xMin": 701,
+            "yMin": 312.5,
+            "width": 148,
+            "height": 93
+        },
+        "labels": {
+            "labelName": "bus",
+            "labelColor": "#ff0000",
+            "labelColorRGB": "255,0,0",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 775,
+            "y": 359
+        },
+        "contentType": "rect"
+    }
+]
