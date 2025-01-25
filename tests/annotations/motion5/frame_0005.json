@@ -1,0 +1,150 @@
+[
+    {
+        "content": [
+            {
+                "x": 432,
+                "y": 348.5
+            },
+            {
+                "x": 552,
+                "y": 348.5
+            },
+            {
+                "x": 552,
+                "y": 444.5
+            },
+            {
+                "x": 432,
+                "y": 444.5
+            }
+        ],
+        "rectMask": {
+            "xMin": 432,
+            "yMin": 348.5,
+            "width": 120,
+            "height": 96
+        },
+        "labels": {
+            "labelName": "car",
+            "labelColor": "#ff0000",
+            "labelColorRGB": "255,0,0",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 492,
+            "y": 396.5
+        },
+        "contentType": "rect"
+    },
+    {
+        "content": [
+            {
+                "x": 565,
+                "y": 334.5
+            },
+            {
+                "x": 697,
+                "y": 334.5
+            },
+            {
+                "x": 697,
+                "y": 437.5
+            },
+            {
+                "x": 565,
+                "y": 437.5
+            }
+        ],
+        "rectMask": {
+            "xMin": 565,
+            "yMin": 334.5,
+            "width": 132,
+            "height": 103
+        },
+        "labels": {
+            "labelName": "car",
+            "labelColor": "#ff0000",
+            "labelColorRGB": "255,0,0",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 631,
+            "y": 386
+        },
+        "contentType": "rect"
+    },
+    {
+        "content": [
+            {
+                "x": 684,
+                "y": 314.5
+            },
+            {
+                "x": 824,
+                "y": 314.5
+            },
+            {
+                "x": 824,
+                "y": 401.5
+            },
+            {
+                "x": 684,
+                "y": 401.5
+            }
+        ],
+        "rectMask": {
+            "xMin": 684,
+            "yMin": 314.5,
+            "width": 140,
+            "height": 87
+        },
+        "labels": {
+            "labelName": "bus",
+            "labelColor": "#ff0000",
+            "labelColorRGB": "255,0,0",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 754,
+            "y": 358
+        },
+        "contentType": "rect"
+    },
+    {
+        "content": [
+            {
+                "x": 819,
+                "y": 358.5
+            },
+            {
+                "x": 935,
+                "y": 358.5
+            },
+            {
+                "x": 935,
+                "y": 430.5
+            },
+            {
+                "x": 819,
+                "y": 430.5
+            }
+        ],
+        "rectMask": {
+            "xMin": 819,
+            "yMin": 358.5,
+            "width": 116,
+            "height": 72
+        },
+        "labels": {
+            "labelName": "car",
+            "labelColor": "#ff0000",
+            "labelColorRGB": "255,0,0",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 877,
+            "y": 394.5
+        },
+        "contentType": "rect"
+    }
+]

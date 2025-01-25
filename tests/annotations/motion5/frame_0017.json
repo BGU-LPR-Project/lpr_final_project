@@ -1,0 +1,113 @@
+[
+    {
+        "content": [
+            {
+                "x": 533,
+                "y": 349.5
+            },
+            {
+                "x": 629,
+                "y": 349.5
+            },
+            {
+                "x": 629,
+                "y": 423.5
+            },
+            {
+                "x": 533,
+                "y": 423.5
+            }
+        ],
+        "rectMask": {
+            "xMin": 533,
+            "yMin": 349.5,
+            "width": 96,
+            "height": 74
+        },
+        "labels": {
+            "labelName": "unnamed",
+            "labelColor": "red",
+            "labelColorRGB": "255,0,0",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 581,
+            "y": 386.5
+        },
+        "contentType": "rect"
+    },
+    {
+        "content": [
+            {
+                "x": 598,
+                "y": 310.5
+            },
+            {
+                "x": 747,
+                "y": 310.5
+            },
+            {
+                "x": 747,
+                "y": 409.5
+            },
+            {
+                "x": 598,
+                "y": 409.5
+            }
+        ],
+        "rectMask": {
+            "xMin": 598,
+            "yMin": 310.5,
+            "width": 149,
+            "height": 99
+        },
+        "labels": {
+            "labelName": "unnamed",
+            "labelColor": "red",
+            "labelColorRGB": "255,0,0",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 672.5,
+            "y": 360
+        },
+        "contentType": "rect"
+    },
+    {
+        "content": [
+            {
+                "x": 810,
+                "y": 362.5
+            },
+            {
+                "x": 887,
+                "y": 362.5
+            },
+            {
+                "x": 887,
+                "y": 428.5
+            },
+            {
+                "x": 810,
+                "y": 428.5
+            }
+        ],
+        "rectMask": {
+            "xMin": 810,
+            "yMin": 362.5,
+            "width": 77,
+            "height": 66
+        },
+        "labels": {
+            "labelName": "unnamed",
+            "labelColor": "red",
+            "labelColorRGB": "255,0,0",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 848.5,
+            "y": 395.5
+        },
+        "contentType": "rect"
+    }
+]

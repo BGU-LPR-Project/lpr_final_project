@@ -1,0 +1,187 @@
+[
+    {
+        "content": [
+            {
+                "x": 348,
+                "y": 309.5
+            },
+            {
+                "x": 472,
+                "y": 309.5
+            },
+            {
+                "x": 472,
+                "y": 431.5
+            },
+            {
+                "x": 348,
+                "y": 431.5
+            }
+        ],
+        "rectMask": {
+            "xMin": 348,
+            "yMin": 309.5,
+            "width": 124,
+            "height": 122
+        },
+        "labels": {
+            "labelName": "unnamed",
+            "labelColor": "red",
+            "labelColorRGB": "255,0,0",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 410,
+            "y": 370.5
+        },
+        "contentType": "rect"
+    },
+    {
+        "content": [
+            {
+                "x": 552,
+                "y": 332.5
+            },
+            {
+                "x": 641,
+                "y": 332.5
+            },
+            {
+                "x": 641,
+                "y": 432.5
+            },
+            {
+                "x": 552,
+                "y": 432.5
+            }
+        ],
+        "rectMask": {
+            "xMin": 552,
+            "yMin": 332.5,
+            "width": 89,
+            "height": 100
+        },
+        "labels": {
+            "labelName": "unnamed",
+            "labelColor": "red",
+            "labelColorRGB": "255,0,0",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 596.5,
+            "y": 382.5
+        },
+        "contentType": "rect"
+    },
+    {
+        "content": [
+            {
+                "x": 613,
+                "y": 352.5
+            },
+            {
+                "x": 726,
+                "y": 352.5
+            },
+            {
+                "x": 726,
+                "y": 436.5
+            },
+            {
+                "x": 613,
+                "y": 436.5
+            }
+        ],
+        "rectMask": {
+            "xMin": 613,
+            "yMin": 352.5,
+            "width": 113,
+            "height": 84
+        },
+        "labels": {
+            "labelName": "unnamed",
+            "labelColor": "red",
+            "labelColorRGB": "255,0,0",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 669.5,
+            "y": 394.5
+        },
+        "contentType": "rect"
+    },
+    {
+        "content": [
+            {
+                "x": 714,
+                "y": 323.5
+            },
+            {
+                "x": 891,
+                "y": 323.5
+            },
+            {
+                "x": 891,
+                "y": 443.5
+            },
+            {
+                "x": 714,
+                "y": 443.5
+            }
+        ],
+        "rectMask": {
+            "xMin": 714,
+            "yMin": 323.5,
+            "width": 177,
+            "height": 120
+        },
+        "labels": {
+            "labelName": "unnamed",
+            "labelColor": "red",
+            "labelColorRGB": "255,0,0",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 802.5,
+            "y": 383.5
+        },
+        "contentType": "rect"
+    },
+    {
+        "content": [
+            {
+                "x": 835,
+                "y": 307.5
+            },
+            {
+                "x": 960,
+                "y": 307.5
+            },
+            {
+                "x": 960,
+                "y": 433.5
+            },
+            {
+                "x": 835,
+                "y": 433.5
+            }
+        ],
+        "rectMask": {
+            "xMin": 835,
+            "yMin": 307.5,
+            "width": 125,
+            "height": 126
+        },
+        "labels": {
+            "labelName": "unnamed",
+            "labelColor": "red",
+            "labelColorRGB": "255,0,0",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 897.5,
+            "y": 370.5
+        },
+        "contentType": "rect"
+    }
+]
