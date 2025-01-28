@@ -7,6 +7,7 @@ import paddleocr
 from tracking import CentroidTracker
 from collections import OrderedDict
 import re
+from PIL import Image, ImageEnhance
 
 
 class CarDetector:
@@ -23,6 +24,30 @@ class CarDetector:
         self.confidence_threshold = confidence_threshold
         self.tracker = CentroidTracker()
 
+    def detect_cars_for_test(self, frame: np.ndarray) -> List[BoundingBox]:
+        # Extract results from the detections
+        results = self.model(frame)
+        detected_cars = results[0].boxes
+
+        detections = []
+
+        for box in detected_cars:
+            confidence = box.conf[0].item()  # Get confidence
+            class_id = int(box.cls[0].item())  # Get the class ID
+
+            # Extract the bounding box coordinates
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            detected_car_box = BoundingBox(x1, y1, x2 - x1, y2 - y1, confidence)
+
+            # Class ID 2 is 'car', Class ID 3 is 'motorcycle', Class ID 5 is 'bus', Class ID 7 is 'truck' 
+            is_object_of_interest = (class_id == 2 or class_id == 3 or class_id == 5 or class_id == 7)
+
+            # Check if the detected car overlaps with any motion detection
+            if confidence > self.confidence_threshold and is_object_of_interest:
+                detections.append(detected_car_box)
+
+        return detections
+    
     def detect_moving_cars(self, visualize_frame: np.ndarray, frame: np.ndarray, motion_bounding_boxes: List[BoundingBox]) -> List[BoundingBox]:
         """
         Detect moving cars by checking YOLO car detections that overlap with motion detections.
@@ -178,27 +203,41 @@ class LicensePlateDetector:
         Returns:
             str: Validated license plate text.
         """
-        # Resize for consistency
-        resized = cv2.resize(cropped_plate.copy(), (300, 100), interpolation=cv2.INTER_CUBIC)
-
-        # Convert to grayscale and preprocess
-        gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
-        blurred = cv2.GaussianBlur(gray,(5,5), 0)
-
-        # Adaptive thresholding
-        _, otsu_thresh = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
-
-        # Apply a mask to focus on the central region
-        h, w = otsu_thresh.shape
-        mask = np.zeros((h, w), dtype=np.uint8)
-        cv2.rectangle(mask, (int(0.1 * w), int(0.2 * h)), (int(0.9 * w), int(0.8 * h)), 255, -1)
-        masked_plate = cv2.bitwise_and(otsu_thresh, otsu_thresh, mask=mask)
+        image = cv2.cvtColor(cropped_plate, cv2.COLOR_BGR2RGB)
+        pil_image = Image.fromarray(image)
         
-        cv2.imshow("plate", blurred)
+        # Apply color jitter
+        enhancer = ImageEnhance.Brightness(pil_image)
+        pil_image = enhancer.enhance(np.random.uniform(0.6, 1.4))  # Adjust brightness
+        enhancer = ImageEnhance.Contrast(pil_image)
+        pil_image = enhancer.enhance(np.random.uniform(0.6, 1.4))  # Adjust contrast
+        enhancer = ImageEnhance.Color(pil_image)
+        pil_image = enhancer.enhance(np.random.uniform(0.6, 1.4))  # Adjust saturation
+        enhancer = ImageEnhance.Sharpness(pil_image)
+        pil_image = enhancer.enhance(2)  # Sharpen the image
+    
+        # Convert back to BGR for OpenCV
+        image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+        
+        # Resize the image to fit the desired aspect ratio
+        height, width, _ = image.shape
+        new_width = 320
+        new_height = 48
+        scale = new_height / height
+        resized_width = int(width * scale)
+        
+        # Resize and apply adaptive threshold if it is still legible
+        resized_image = cv2.resize(image, (resized_width, new_height), interpolation=cv2.INTER_AREA)
+        
+        # Pad the resized image to maintain aspect ratio
+        final_image = np.zeros((new_height, new_width, 3), dtype=np.uint8)
+        x_offset = (new_width - resized_width) // 2
+        final_image[:, x_offset:x_offset+resized_width] = resized_image
+        
+        cv2.imshow("plate", final_image)
         # Use OCR
         try:
-            results = self.reader.ocr(blurred)
+            results = self.reader.ocr(final_image)
 
             selected_result = None
             selected_confidence = 0.0

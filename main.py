@@ -37,6 +37,7 @@ class LPRPipeline:
             r'[1-9A-Z]{1}[A-Z]{3}[0-9]{3}',
             r'[1-9A-Z]{1}[A-Z]{5}',
             r'^[1-9][A-Z]{3}[0-9]{3}$', #California License Plate
+            r'[A-Z]{1}[0-9]{3}[A-Z]{2}[0-9]{3}'
         ])
         self.license_plate_table: Dict[str, LicensePlate] = {}  # Hash table for license plates
 
@@ -58,7 +59,7 @@ class LPRPipeline:
                 if frame is None:
                     break
 
-                frame = cv2.resize(frame, (frame_width, frame_height))
+                frame = cv2.resize(frame, (frame_width, frame_height), interpolation=cv2.INTER_AREA)
 
                 control_frame = region_adjuster.draw_overlay(frame)  # Apply transparent red overlay
                 region_adjuster.draw_boundary(control_frame)  # Draw the line and endpoints
