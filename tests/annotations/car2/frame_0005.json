@@ -1,0 +1,76 @@
+[
+    {
+        "content": [
+            {
+                "x": 148.5,
+                "y": 119
+            },
+            {
+                "x": 0,
+                "y": 119
+            },
+            {
+                "x": 0,
+                "y": 194
+            },
+            {
+                "x": 148.5,
+                "y": 194
+            }
+        ],
+        "rectMask": {
+            "xMin": 148.5,
+            "yMin": 119,
+            "width": -148.5,
+            "height": 75
+        },
+        "labels": {
+            "labelName": "car",
+            "labelColor": "#b89090",
+            "labelColorRGB": "184,144,144",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 74.25,
+            "y": 156.5
+        },
+        "contentType": "rect"
+    },
+    {
+        "content": [
+            {
+                "x": 583.5,
+                "y": 145
+            },
+            {
+                "x": 640,
+                "y": 145
+            },
+            {
+                "x": 640,
+                "y": 199
+            },
+            {
+                "x": 583.5,
+                "y": 199
+            }
+        ],
+        "rectMask": {
+            "xMin": 583.5,
+            "yMin": 145,
+            "width": 56.5,
+            "height": 54
+        },
+        "labels": {
+            "labelName": "car",
+            "labelColor": "#b89090",
+            "labelColorRGB": "184,144,144",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 611.75,
+            "y": 172
+        },
+        "contentType": "rect"
+    }
+]

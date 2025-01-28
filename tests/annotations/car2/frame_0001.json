@@ -1,0 +1,39 @@
+[
+    {
+        "content": [
+            {
+                "x": 331.5,
+                "y": 129
+            },
+            {
+                "x": 526.5,
+                "y": 129
+            },
+            {
+                "x": 526.5,
+                "y": 196
+            },
+            {
+                "x": 331.5,
+                "y": 196
+            }
+        ],
+        "rectMask": {
+            "xMin": 331.5,
+            "yMin": 129,
+            "width": 195,
+            "height": 67
+        },
+        "labels": {
+            "labelName": "car",
+            "labelColor": "#b89090",
+            "labelColorRGB": "184,144,144",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 429,
+            "y": 162.5
+        },
+        "contentType": "rect"
+    }
+]
