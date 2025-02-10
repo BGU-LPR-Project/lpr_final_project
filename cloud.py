@@ -6,9 +6,8 @@ from edge import BoundingBox
 import paddleocr
 from tracking import CentroidTracker
 from collections import OrderedDict
-import re
-from PIL import Image, ImageEnhance
-
+import util
+from formats import *
 
 class CarDetector:
     def __init__(self, model_path: str, confidence_threshold: float = 0.0):
@@ -95,7 +94,7 @@ class CarDetector:
 
 class LicensePlateDetector:
 
-    def __init__(self, model_path: str, allowed_formats: list[str], confidence_threshold: float = 0.5):
+    def __init__(self, model_path: str, confidence_threshold: float = 0.5):
         """
         Initialize the LicensePlateDetector class.
         
@@ -107,9 +106,8 @@ class LicensePlateDetector:
         self.model = YOLO(model_path)
         self.confidence_threshold = confidence_threshold
         self.reader = paddleocr.PaddleOCR(use_angle_cls=True, lang='en')
-        self.allowed_formats = [re.compile(fmt) for fmt in allowed_formats]
        
-    def detect_license_plates(self, visualize_frame: np.ndarray, frame: np.ndarray, detected_cars: OrderedDict):
+    def detect_license_plates(self, visualize_frame: np.ndarray, frame: np.ndarray, detected_cars: OrderedDict, is_in_entrance_or_exit):
         """
         Detect license plates in the frame and associate them with tracked cars.
         The matching logic is extracted into a separate method.
@@ -127,14 +125,17 @@ class LicensePlateDetector:
                 if best_match_car_id is not None:
                     # Retrieve the car's bounding box and details
                     car_details = detected_cars[best_match_car_id]
-                    current_plate_number = car_details["plate_number"]
-                    current_plate_confidence = car_details["confidence"]
+                    ocr_results = car_details["ocr_results"]
+
                     # Crop the license plate region
                     cropped_plate = frame[int(y1):int(y2), int(x1):int(x2)]
-                    ocr_text, ocr_confidence = self.read_text_from_plate(cropped_plate)
-                    processed_text = self.process_plate(ocr_text) if ocr_text is not None else None
+
+                    ocr_text, ocr_confidence = self.read_text_from_plate(cropped_plate, best_match_car_id)
+                    processed_text = process_plate(ocr_text) if ocr_text is not None else None
                     if (processed_text is not None): 
-                        car_details['plate_number'] = processed_text
+                        ocr_results.append(processed_text)
+                        car_details["direction"] = is_in_entrance_or_exit((x1, y1, x2, y2))
+                        car_details['plate_number'] = util.weighted_majority_vote(ocr_results)
                         car_details["confidence"] = ocr_confidence
 
         return detected_cars
@@ -191,9 +192,7 @@ class LicensePlateDetector:
 
         return vertically_aligned and horizontally_aligned
 
-
-
-    def read_text_from_plate(self, cropped_plate: np.ndarray, confidence_threshold = 0.8) -> str:
+    def read_text_from_plate(self, cropped_plate: np.ndarray, car_id,confidence_threshold = 0.8) -> str:
         """
         Read text from the cropped license plate using OCR, with filtering for irrelevant areas.
 
@@ -203,41 +202,28 @@ class LicensePlateDetector:
         Returns:
             str: Validated license plate text.
         """
-        image = cv2.cvtColor(cropped_plate, cv2.COLOR_BGR2RGB)
-        pil_image = Image.fromarray(image)
+        # Resize the plate to standard size
+        resized = util.resize_plate(cropped_plate)
         
-        # Apply color jitter
-        enhancer = ImageEnhance.Brightness(pil_image)
-        pil_image = enhancer.enhance(np.random.uniform(0.6, 1.4))  # Adjust brightness
-        enhancer = ImageEnhance.Contrast(pil_image)
-        pil_image = enhancer.enhance(np.random.uniform(0.6, 1.4))  # Adjust contrast
-        enhancer = ImageEnhance.Color(pil_image)
-        pil_image = enhancer.enhance(np.random.uniform(0.6, 1.4))  # Adjust saturation
-        enhancer = ImageEnhance.Sharpness(pil_image)
-        pil_image = enhancer.enhance(2)  # Sharpen the image
-    
-        # Convert back to BGR for OpenCV
-        image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
-        
-        # Resize the image to fit the desired aspect ratio
-        height, width, _ = image.shape
-        new_width = 320
-        new_height = 48
-        scale = new_height / height
-        resized_width = int(width * scale)
-        
-        # Resize and apply adaptive threshold if it is still legible
-        resized_image = cv2.resize(image, (resized_width, new_height), interpolation=cv2.INTER_AREA)
-        
-        # Pad the resized image to maintain aspect ratio
-        final_image = np.zeros((new_height, new_width, 3), dtype=np.uint8)
-        x_offset = (new_width - resized_width) // 2
-        final_image[:, x_offset:x_offset+resized_width] = resized_image
-        
-        cv2.imshow("plate", final_image)
+        # Convert to grayscale
+        gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
+
+        # Remove noise            
+        blur = cv2.GaussianBlur(gray, (3,3), 0)
+
+        # Sharpen using HBF
+        sharp = util.sharpenHBF(blur)
+
+        # Clip values to maintain valid range
+        sharp = np.clip(sharp, 0, 255).astype(np.uint8)
+
+        ocr_ready = sharp
+
+        cv2.imshow(f"ocr-plate {car_id}", ocr_ready)
+
         # Use OCR
         try:
-            results = self.reader.ocr(final_image)
+            results = self.reader.ocr(ocr_ready)
 
             selected_result = None
             selected_confidence = 0.0
@@ -254,70 +240,8 @@ class LicensePlateDetector:
             if high_confidence_results:
                 # Select the result with the highest confidence
                 selected_result, selected_confidence = max(high_confidence_results, key=lambda x: x[1])
-
             return selected_result, selected_confidence
 
         except Exception as e:
             print(f"Error during OCR: {e}")
             return None, 0.0
-        
-    def validate_plate(self, plate_text: str) -> bool:
-        """
-        Validate the OCR result against allowed formats.
-        
-        Parameters:
-        - plate_text: The license plate text detected by OCR.
-        
-        Returns:
-        - bool: True if the plate matches any allowed format, False otherwise.
-        """
-        for pattern in self.allowed_formats:
-            if re.fullmatch(pattern, plate_text):
-                return True
-        return False
-
-    def format_plate(self, plate_text: str) -> str:
-        """
-        Format the OCR result by correcting common mistakes and standardizing.
-        
-        Parameters:
-            plate_text: The license plate text detected by OCR.
-        
-        Returns:
-            str: A formatted plate string.
-        """
-        corrections = {
-            'O': '0',  # Replace letter 'O' with zero
-            'I': '1',  # Replace letter 'I' with one
-            'Z': '2',   # Replace letter 'Z' with two
-            'S': '5',   # Replace letter 'S' with two
-        }
-
-        # Apply corrections
-        corrected_plate = ''.join(corrections.get(char, char) for char in plate_text)
-
-        return corrected_plate
-
-    def process_plate(self, plate_text: str) -> str:
-        """
-        Validate and format the OCR result.
-        
-        Parameters:
-            plate_text: The license plate text detected by OCR.
-        
-        Returns:
-            str: The formatted plate if valid, otherwise None.
-        """
-        plate_text = plate_text.upper().strip()
-
-        # Step 1: Validate the raw OCR result
-        if self.validate_plate(plate_text):
-            return plate_text
-
-        # Step 2: Apply corrections and revalidate
-        formatted_plate = self.format_plate(plate_text)
-        if self.validate_plate(formatted_plate):
-            return formatted_plate
-
-        # If still invalid, return None
-        return None

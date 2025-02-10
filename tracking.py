@@ -18,7 +18,9 @@ class CentroidTracker:
             "centroid": centroid,
             "bbox": bbox,
             "plate_number": "---",
+            "direction": None,
             "confidence": 0.0,
+            "ocr_results": [],
         }
         self.disappeared[self.next_object_id] = 0
         self.next_object_id += 1
