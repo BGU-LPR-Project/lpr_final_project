@@ -97,6 +97,7 @@ class LPRPipeline:
         centroid = data["centroid"]
         bbox = data["bbox"]
         plate_number = data["plate_number"]
+        plate_confidence = data["confidence"]
         direction = data["direction"]
 
         box_color = (0, 255, 0) if authorized else (0, 0, 255)
@@ -111,7 +112,7 @@ class LPRPipeline:
 
         # Optionally display the plate number if available
         if plate_number:
-            cv2.putText(frame, f"Plate: {plate_number}", (x1, y1 - 10),
+            cv2.putText(frame, f"Plate: {plate_number} - {plate_confidence:.2f}", (x1, y1 - 10),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
             
     def logDetectionResults(self):
