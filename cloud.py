@@ -8,6 +8,7 @@ from tracking import CentroidTracker
 from collections import OrderedDict
 import util
 from formats import *
+from datetime import datetime
 
 class CarDetector:
     def __init__(self, model_path: str, confidence_threshold: float = 0.0):
@@ -125,18 +126,28 @@ class LicensePlateDetector:
                 if best_match_car_id is not None:
                     # Retrieve the car's bounding box and details
                     car_details = detected_cars[best_match_car_id]
-                    ocr_results = car_details["ocr_results"]
+                    prev_plate_number = car_details["plate_number"]
+                    prev_confidence = car_details["confidence"]
+                    last_timestamp = car_details["last_timestamp"] 
+                    occurs = car_details["occurs"]
 
-                    # Crop the license plate region
-                    cropped_plate = frame[int(y1):int(y2), int(x1):int(x2)]
+                    difference = datetime.now() - last_timestamp
+                    if difference.total_seconds() > 1 and occurs < 3:
 
-                    ocr_text, ocr_confidence = self.read_text_from_plate(cropped_plate, best_match_car_id)
-                    processed_text = process_plate(ocr_text) if ocr_text is not None else None
-                    if (processed_text is not None): 
-                        ocr_results.append(processed_text)
-                        car_details["direction"] = is_in_entrance_or_exit((x1, y1, x2, y2))
-                        car_details['plate_number'] = util.weighted_majority_vote(ocr_results)
-                        car_details["confidence"] = ocr_confidence
+                        # Crop the license plate region
+                        cropped_plate = frame[int(y1):int(y2), int(x1):int(x2)]
+
+                        ocr_text, ocr_confidence = self.read_text_from_plate(cropped_plate, best_match_car_id)
+                        processed_text = process_plate(ocr_text) if ocr_text is not None else None
+                        if (processed_text is not None and ocr_confidence > prev_confidence): 
+                            car_details["direction"] = is_in_entrance_or_exit((x1, y1, x2, y2))
+                            car_details['plate_number'] = processed_text
+                            car_details["confidence"] = ocr_confidence
+                            car_details["last_timestamp"] = datetime.now()
+                            if prev_plate_number == processed_text:
+                                car_details["occurs"] = occurs + 1
+                            else:
+                                car_details["occurs"] = 0
 
         return detected_cars
 
@@ -219,7 +230,7 @@ class LicensePlateDetector:
 
         ocr_ready = sharp
 
-        cv2.imshow(f"ocr-plate {car_id}", ocr_ready)
+        # cv2.imshow(f"ocr-plate {car_id}", ocr_ready)
 
         # Use OCR
         try:

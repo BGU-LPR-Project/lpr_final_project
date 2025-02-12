@@ -1,9 +1,7 @@
-import cv2
 import numpy as np
 from collections import OrderedDict
 from scipy.spatial import distance as dist
-from ultralytics import YOLO
-
+from datetime import datetime
 
 class CentroidTracker:
     def __init__(self, max_disappeared=5):
@@ -20,7 +18,8 @@ class CentroidTracker:
             "plate_number": "---",
             "direction": None,
             "confidence": 0.0,
-            "ocr_results": [],
+            "last_timestamp": datetime.now(),
+            "occurs": 0,
         }
         self.disappeared[self.next_object_id] = 0
         self.next_object_id += 1
