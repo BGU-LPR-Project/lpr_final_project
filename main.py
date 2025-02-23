@@ -5,6 +5,7 @@ from video_handler import VideoHandler
 from edge import *
 from cloud import *
 from roi import RegionAdjuster
+from auth_manager import AuthManager
 
 class LicensePlate:
     """
@@ -28,6 +29,7 @@ class LPRPipeline:
         self.car_detector = CarDetector("yolo11n.pt")
         self.license_plate_detector = LicensePlateDetector("license_plate_detector.pt")
         self.license_plate_table: Dict[int, LicensePlate] = {}  # Hash table for license plates
+        self.auth_manager = AuthManager(['NA13NRU'], ['GX15OGJ'])
         self.paused = False  # Flag to track pause state
 
     def run(self):
@@ -73,8 +75,8 @@ class LPRPipeline:
                             # Create a new license plate instance
                             self.license_plate_table[object_id] = LicensePlate(plate_number, direction)
                             
-                        authorized = plate_number != "---" #TODO: Call Whitelist component to check plate_number
-                        self.visualize(frame, object_id, data, authorized)
+                        authorization = self.auth_manager.get_vehicle_authorization(plate_number)
+                        self.visualize(frame, object_id, data, authorization)
 
                     # Display the processed frame
                     cv2.imshow("LPR-Control", control_frame)
@@ -100,7 +102,7 @@ class LPRPipeline:
         plate_confidence = data["confidence"]
         direction = data["direction"]
 
-        box_color = (0, 255, 0) if authorized else (0, 0, 255)
+        box_color = (0, 255, 0) if authorized == 1 else ((0, 0, 255) if authorized == -1 else (0, 0, 255))
 
         # Draw the bounding box and centroid
         x1, y1, x2, y2 = bbox
@@ -115,14 +117,44 @@ class LPRPipeline:
             cv2.putText(frame, f"Plate: {plate_number} - {plate_confidence:.2f}", (x1, y1 - 10),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
             
-    def logDetectionResults(self):
-        print("\nSummary of all detected vehicles:")
+    def log_detection_results(self):
+        """
+        Logs the summary of all detected vehicles, categorized into recognized 
+        and unrecognized plates.
+        """
+        recognized_vehicles = []
+        unrecognized_vehicles = []
+
+        # Categorize vehicles based on plate recognition
         for vehicle_id, data in pipeline.license_plate_table.items():
-            print(f"Vehicle-ID: {vehicle_id} | Plate: {data.plate_number} | First seen: {data.first_time_seen} | Last seen: {data.last_time_seen} | Direction: {data.direction}")
+            vehicle_info = (
+                f"Vehicle-ID: {vehicle_id} | Plate: {data.plate_number} | "
+                f"First seen: {data.first_time_seen} | Last seen: {data.last_time_seen} | "
+                f"Direction: {data.direction}"
+            )
+
+            if data.plate_number != '---':
+                recognized_vehicles.append(vehicle_info)
+            else:
+                unrecognized_vehicles.append(vehicle_info)
+
+        # Print recognized vehicles summary
+        print("\nSummary of all recognized detected vehicles:")
+        if recognized_vehicles:
+            print("\n".join(recognized_vehicles))
+        else:
+            print("No recognized vehicles detected.")
+
+        # Print unrecognized vehicles summary
+        print("\nSummary of all unrecognized detected vehicles:")
+        if unrecognized_vehicles:
+            print("\n".join(unrecognized_vehicles))
+        else:
+            print("No unrecognized vehicles detected.")
 
 
 if __name__ == "__main__":
     video_path = "recordings\\motion4.mp4"
     pipeline = LPRPipeline(video_path)
     pipeline.run()
-    pipeline.logDetectionResults()
+    pipeline.log_detection_results()
