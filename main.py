@@ -1,4 +1,3 @@
-from typing import Dict
 import cv2
 from datetime import datetime
 from video_handler import VideoHandler
@@ -6,6 +5,8 @@ from edge import *
 from cloud import *
 from roi import RegionAdjuster
 from auth_manager import AuthManager
+from typing import Dict
+import os
 
 class LicensePlate:
     """
@@ -25,12 +26,59 @@ class LicensePlate:
 class LPRPipeline:
     def __init__(self, video_path: str):
         self.video_processor = VideoHandler(video_path)
+        self.video_path = video_path
+        self.cap = cv2.VideoCapture(video_path)
         self.motion_detector = MotionDetector()  # Make sure it uses the updated MotionDetector
         self.car_detector = CarDetector("yolo11n.pt")
-        self.license_plate_detector = LicensePlateDetector("license_plate_detector.pt")
+
+        model_path = os.path.join(os.path.dirname(__file__), "license_plate_detector.pt")
+        print("Model Path:", model_path)
+        print("Exists?", os.path.exists(model_path))
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Model file not found: {model_path}")
+        self.license_plate_detector = LicensePlateDetector(model_path)
+        
         self.license_plate_table: Dict[int, LicensePlate] = {}  # Hash table for license plates
         self.auth_manager = AuthManager(['NA13NRU'], ['GX15OGJ'])
         self.paused = False  # Flag to track pause state
+        self.detected_plates = []
+
+    def run_ui_mode(self, frame):
+        """
+        Runs the LPR pipeline on a single frame and returns detected license plates.
+        Used in UI mode instead of OpenCV's imshow.
+        """
+        frame_width, frame_height = frame.shape[1], frame.shape[0]
+        region_adjuster = RegionAdjuster(frame_width, frame_height)
+
+        roi_masked = region_adjuster.apply_roi_mask(frame)
+
+        motion_boxes = self.motion_detector.detect_motion(frame, roi_masked)
+        detected_cars = self.car_detector.detect_moving_cars(frame, roi_masked, motion_boxes)
+        detections = self.license_plate_detector.detect_license_plates(
+            frame, roi_masked, detected_cars, region_adjuster.is_in_entrance_or_exit
+        )
+
+        detected_plates = []
+        for object_id, data in detections.items():
+            plate_number = data["plate_number"]
+            direction = data["direction"]
+
+            if object_id in self.license_plate_table:
+                self.license_plate_table[object_id].update(plate_number, direction)
+            else:
+                self.license_plate_table[object_id] = LicensePlate(plate_number, direction)
+                
+            authorization = self.auth_manager.get_vehicle_authorization(plate_number)
+            detected_plates.append(plate_number)
+
+        return detected_plates  # Return detected plates for UI display
+
+    def pause(self):
+        self.paused = True
+
+    def resume(self):
+        self.paused = False
 
     def run(self):
         # Create a blank frame for demonstration
@@ -94,6 +142,11 @@ class LPRPipeline:
             self.video_processor.release_resources()
             cv2.destroyAllWindows()
 
+    def log_detection_results(self):
+        with open("detection_log.txt", "w") as f:
+            for plate in self.detected_plates:
+                f.write(f"{plate}\n")
+        print("Detection results logged.")
 
     def visualize(self, frame: np.ndarray, object_id: int, data, authorized: bool):
         centroid = data["centroid"]
