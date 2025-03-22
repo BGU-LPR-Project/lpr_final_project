@@ -54,7 +54,9 @@ class LPRPipeline:
         roi_masked = region_adjuster.apply_roi_mask(frame)
 
         motion_boxes = self.motion_detector.detect_motion(frame, roi_masked)
-        detected_cars = self.car_detector.detect_moving_cars(frame, roi_masked, motion_boxes)
+        detected_cars = self.car_detector.detect_moving_cars(
+            frame, roi_masked, motion_boxes, region_adjuster.is_in_entrance_or_exit
+        )
         detections = self.license_plate_detector.detect_license_plates(
             frame, roi_masked, detected_cars, region_adjuster.is_in_entrance_or_exit
         )
@@ -108,7 +110,9 @@ class LPRPipeline:
                     roi_masked = region_adjuster.apply_roi_mask(frame)
 
                     motion_boxes = self.motion_detector.detect_motion(frame, roi_masked)
-                    detected_cars = self.car_detector.detect_moving_cars(frame, roi_masked, motion_boxes)
+                    detected_cars = self.car_detector.detect_moving_cars(
+                        frame, roi_masked, motion_boxes, region_adjuster.is_in_entrance_or_exit
+                    )
                     detections = self.license_plate_detector.detect_license_plates(frame, roi_masked, detected_cars, region_adjuster.is_in_entrance_or_exit)
 
                     # Go over the detections
