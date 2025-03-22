@@ -9,6 +9,8 @@ from collections import OrderedDict
 import util
 from formats import *
 from datetime import datetime
+from typing import Dict
+
 
 class CarDetector:
     def __init__(self, model_path: str, confidence_threshold: float = 0.0):
@@ -47,8 +49,9 @@ class CarDetector:
                 detections.append(detected_car_box)
 
         return detections
-    
-    def detect_moving_cars(self, visualize_frame: np.ndarray, frame: np.ndarray, motion_bounding_boxes: List[BoundingBox]) -> List[BoundingBox]:
+
+    def detect_moving_cars(self, visualize_frame: np.ndarray, frame: np.ndarray,
+                           motion_bounding_boxes: List[BoundingBox], direction_callback) -> Dict:
         """
         Detect moving cars by checking YOLO car detections that overlap with motion detections.
 
@@ -61,37 +64,36 @@ class CarDetector:
         """
         moving_cars = []
 
-        # Perform detection using the YOLO model
         results = self.model(frame)
-
-        # Extract results from the detections
         detected_cars = results[0].boxes
-
         detections = []
 
         for box in detected_cars:
-            confidence = box.conf[0].item()  # Get confidence
-            class_id = int(box.cls[0].item())  # Get the class ID
+            confidence = box.conf[0].item()
+            class_id = int(box.cls[0].item())
 
-            # Extract the bounding box coordinates
             x1, y1, x2, y2 = map(int, box.xyxy[0])
             detected_car_box = BoundingBox(x1, y1, x2 - x1, y2 - y1, confidence)
 
-            # Class ID 2 is 'car', Class ID 3 is 'motorcycle', Class ID 5 is 'bus', Class ID 7 is 'truck' 
-            is_object_of_interest = (class_id == 2 or class_id == 3 or class_id == 5 or class_id == 7)
+            is_object_of_interest = class_id in [2, 3, 5, 7]
 
-            # Check if the detected car overlaps with any motion detection
             if confidence > self.confidence_threshold and is_object_of_interest:
                 for motion_box in motion_bounding_boxes:
                     if detected_car_box.intersects_with(motion_box):
                         moving_cars.append(detected_car_box)
-                        detections.append((x1,y1,x2,y2))
-                        continue
+                        detections.append((x1, y1, x2, y2))
+                        break
 
         filtered_detections = self.tracker.non_max_suppression_fast(detections)
-        cars = self.tracker.update(filtered_detections)
+        updated_objects = self.tracker.update(filtered_detections)
 
-        return cars
+        # Use direction callback clearly here:
+        for obj in updated_objects.values():
+            bbox = obj["bbox"]
+            obj["direction"] = direction_callback(bbox)
+
+        return updated_objects
+
 
 class LicensePlateDetector:
 
