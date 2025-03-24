@@ -74,7 +74,7 @@ class LPRPipeline:
                         else:
                             # Create a new license plate instance
                             self.license_plate_table[object_id] = LicensePlate(plate_number, direction)
-                            
+
                         authorization = self.auth_manager.get_vehicle_authorization(plate_number)
                         self.visualize(frame, object_id, data, authorization)
 
@@ -116,10 +116,10 @@ class LPRPipeline:
         if plate_number:
             cv2.putText(frame, f"Plate: {plate_number} - {plate_confidence:.2f}", (x1, y1 - 10),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
-            
+
     def log_detection_results(self):
         """
-        Logs the summary of all detected vehicles, categorized into recognized 
+        Logs the summary of all detected vehicles, categorized into recognized
         and unrecognized plates.
         """
         recognized_vehicles = []
@@ -154,7 +154,7 @@ class LPRPipeline:
 
 
 if __name__ == "__main__":
-    video_path = "recordings\\motion4.mp4"
+    video_path = "recordings\\rec6.mp4"
     pipeline = LPRPipeline(video_path)
     pipeline.run()
     pipeline.log_detection_results()
