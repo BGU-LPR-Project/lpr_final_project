@@ -1,0 +1,25 @@
+services:
+  video_service:
+    build: ./video_service
+    volumes:
+      - ./recordings:/app/recordings
+    ports:
+      - "8000:8000"
+
+  edge_service:
+    build: ./edge_service
+    volumes:
+      - ./models:/app/models  # clearly add this line
+    ports:
+      - "8001:8000"
+    depends_on:
+      - video_service
+
+  cloud_service:
+    build: ./cloud_service
+    volumes:
+      - ./models:/app/models  # clearly also add here for cloud service later
+    ports:
+      - "8002:8000"
+    depends_on:
+      - edge_service
