@@ -1,0 +1,9 @@
+flask
+paddleocr
+numpy
+opencv-python-headless
+ultralytics
+scipy
+matplotlib
+scikit-image
+paddlepaddle
