@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  cloud:
+    build: ./cloud-service
+    container_name: cloud-service
+    networks:
+      - lprnet
+
+  edge:
+    build: ./edge-service
+    container_name: edge-service
+    depends_on:
+      - cloud
+    volumes:
+      - ./models:/models
+      - ./roi_config.json:/app/roi_config.json
+
+    networks:
+      - lprnet
+
+  video:
+    build: ./video-service
+    container_name: video-service
+    depends_on:
+      - edge
+    volumes:
+      - ./recordings:/recordings
+      - ./roi_config.json:/app/roi_config.json
+    networks:
+      lprnet:
+        aliases:
+          - video
+
+networks:
+  lprnet:
+    driver: bridge

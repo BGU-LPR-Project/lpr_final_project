@@ -1,8 +1,0 @@
-opencv-python-headless
-numpy
-ultralytics
-paddleocr
-paddlepaddle
-scikit-image
-scipy
-matplotlib
