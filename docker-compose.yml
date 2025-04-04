@@ -1,25 +1,43 @@
+version: '3'
 services:
   video_service:
     build: ./video_service
     volumes:
       - ./recordings:/app/recordings
     ports:
-      - "8000:8000"
+      - "8000:8000" # Expose for frame retrieval
+    depends_on:
+      - redis
+    networks:
+      - app_network
 
   edge_service:
     build: ./edge_service
     volumes:
-      - ./models:/app/models  # clearly add this line
+      - ./models:/app/models # Make sure this points to the correct local directory
     ports:
-      - "8001:8000"
+      - "8001:8000" # Expose for frame processing
     depends_on:
-      - video_service
+      - redis
+    networks:
+      - app_network
+
+  redis:
+    image: "redis:alpine"
+    networks:
+      - app_network
 
   cloud_service:
     build: ./cloud_service
     volumes:
-      - ./models:/app/models  # clearly also add here for cloud service later
+      - ./models:/app/models # Make sure this points to the correct local directory
     ports:
-      - "8002:8000"
+      - "8002:8000" # Expose for cloud interactions
     depends_on:
       - edge_service
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge

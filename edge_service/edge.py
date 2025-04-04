@@ -74,9 +74,8 @@ class EdgeService:
             return
 
         try:
-            roi_frame = self.region_adjuster.apply_roi_mask(frame)
+            roi_frame = frame #self.region_adjuster.apply_roi_mask(frame)
             motion_boxes = self.motion_detector.detect_motion(roi_frame)
-
             detected_cars = self.detect_moving_cars(roi_frame, motion_boxes)
             detected_objects = self.detect_license_plate_boxes(roi_frame, detected_cars)
 
@@ -107,18 +106,13 @@ class EdgeService:
         return tracked_cars
 
     def detect_license_plate_boxes(self, frame, detected_cars):
-        plates_results = self.plate_model(frame)[0].boxes.data.tolist()
-
-        for car_id, data in detected_cars.items():
-            data["plate_bbox"] = None
-            data["plate_number"] = "---"
-            data["confidence"] = 0
-            data["direction"] = "unknown"
-            data["occurs"] = 0
-            data["last_timestamp"] = datetime.now()
+        plates_results = self.plate_model(frame)[0].boxes
 
         for plate in plates_results:
-            x1, y1, x2, y2, confidence, class_id = plate
+            confidence = plate.conf[0].item()
+            class_id = int(plate.cls[0].item())
+            x1, y1, x2, y2 = map(int, plate.xyxy[0])
+
             if confidence > self.confidence_threshold and int(class_id) == 0:
                 plate_box = BoundingBox(int(x1), int(y1), int(x2 - x1), int(y2 - y1), confidence)
                 best_match_car_id = self.match_plate_to_car(plate_box, detected_cars)
