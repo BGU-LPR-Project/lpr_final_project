@@ -20,28 +20,23 @@ class CloudService:
             CB(None)
             return
 
-        predictions = []
-        confidences = []
-        for _ in range(3):  # clearly OCR 3 times
-            text, conf = self.read_text_from_plate(plate_img)
-            if text:
-                predictions.append(text)
-                confidences.append(conf)
+        text, conf = self.read_text_from_plate(plate_img)
 
-        final_plate = util.weighted_majority_vote(predictions)
+        final_plate = text if text else "---"
 
         CB(final_plate)
 
     def read_text_from_plate(self, cropped_plate, confidence_threshold=0.8):
+        print("here1!")
         resized = util.resize_plate(cropped_plate)
         gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
         blur = cv2.GaussianBlur(gray, (3,3), 0)
         sharp = util.sharpenHBF(blur)
         sharp = np.clip(sharp, 0, 255).astype(np.uint8)
-
+        print("here2!")
         try:
             results = self.reader.ocr(sharp)
-
+            print("here3!")
             if not results or results[0] is None:
                 return None, 0.0
 
