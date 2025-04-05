@@ -1,10 +1,12 @@
 import sys
 import cv2
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QLabel, QFileDialog, QListWidget, QHBoxLayout, QSizePolicy, QRadioButton, QButtonGroup
-from PyQt5.QtGui import QPixmap, QImage, QIcon
-from PyQt5.QtCore import QTimer, Qt
+from PyQt5.QtGui import QPixmap, QImage, QIcon, QFont  
+from PyQt5.QtCore import QTimer, Qt, QSize
 from main import LPRPipeline
 import os
+# import qdarkstyle
+
 
 from roi import RegionAdjuster
 from cloud import CarDetector, LicensePlateDetector
@@ -13,7 +15,7 @@ from collections import OrderedDict
 
 
 
-ICON_DIR = os.path.abspath("icons")
+ICON_DIR = os.path.join(os.path.dirname(__file__), "icons")
 
 
 class LPRApp(QWidget):
@@ -27,7 +29,8 @@ class LPRApp(QWidget):
 
         # Initialize detection and tracking
         self.car_detector = CarDetector("yolo11n.pt")
-        self.license_plate_detector = LicensePlateDetector("license_plate_detector.pt")
+        MODEL_PATH = os.path.join(os.path.dirname(__file__), "license_plate_detector.pt")
+        self.license_plate_detector = LicensePlateDetector(MODEL_PATH)
         self.motion_detector = MotionDetector()
 
         self.region_adjuster = None  # Initialize later with video dimensions
@@ -67,22 +70,20 @@ class LPRApp(QWidget):
         # Sidebar widgets
         sidebar_layout = QVBoxLayout()
         sidebar_layout.setAlignment(Qt.AlignTop)
+        sidebar_layout.setSpacing(10)
+        sidebar_layout.setContentsMargins(10, 20, 10, 10)
+
+        sidebar = QWidget()
+        sidebar.setObjectName("sidebar")
+        sidebar.setLayout(sidebar_layout)
 
         # Mode selection buttons
         self.region_btn = QPushButton("Region Selection")
         self.regular_btn = QPushButton("Regular Playback")
         self.detection_btn = QPushButton("Detection View")
 
-        # Button group styling
-        button_style = """
-            QPushButton {
-                background-color: #2E3B4E; color: white; padding: 10px; border-radius: 5px;
-            }
-            QPushButton:hover { background-color: #3F4D60; }
-            QPushButton:pressed { background-color: #1F2A3A; }
-        """
+        
         for btn in [self.region_btn, self.regular_btn, self.detection_btn]:
-            btn.setStyleSheet(button_style)
             sidebar_layout.addWidget(btn)
 
         # Statistics labels
@@ -96,38 +97,79 @@ class LPRApp(QWidget):
         self.total_count_label = QLabel("Total Counted: 0")
         self.total_detected_label = QLabel("Total Detected: 0")
 
+        stats_style = """
+        background-color: #d2e5f5;
+        padding: 4px;
+        border-radius: 4px;
+        color: #003B73;
+        font-weight: bold;
+        """
+
         for lbl in [self.entrance_count_label, self.entrance_detected_label,
                     self.exit_count_label, self.exit_detected_label,
                     self.total_count_label, self.total_detected_label]:
-            lbl.setStyleSheet("font-size: 14px; padding: 5px;")
+            lbl.setStyleSheet(stats_style)
+            lbl.setContentsMargins(0, 2, 0, 2)
+            # lbl.setStyleSheet("font-size: 14px; padding: 5px; color: white; font-weight: bold;")
             sidebar_layout.addWidget(lbl)
 
         sidebar_layout.addSpacing(20)
         sidebar_layout.addWidget(QLabel("Currently Detected Plates:"))
         self.plates_list = QListWidget()
+        self.plates_list.setStyleSheet("""
+        QListWidget {
+            background-color: #ffffff;
+            border: 1px solid #c3d9ee;
+            border-radius: 6px;
+            color: #003B73;
+            font-size: 10pt;
+            padding: 6px;
+        }
+        """)
         sidebar_layout.addWidget(self.plates_list)
 
         # Horizontal layout (sidebar + video)
         main_layout = QHBoxLayout()
-        main_layout.addLayout(sidebar_layout, 2)  # Sidebar takes 20% width
+        main_layout.addWidget(sidebar, 2)  # Sidebar takes 20% width
         main_layout.addWidget(self.video_label, 8)  # Video takes 80% width
 
         # Bottom playback control buttons
         control_layout = QHBoxLayout()
-        self.load_btn = QPushButton("Load Video")
-        self.play_btn = QPushButton("Play")
-        self.pause_btn = QPushButton("Pause")
-        self.restart_btn = QPushButton("Restart")
+        control_layout = QHBoxLayout()
+        
+        self.load_btn = QPushButton()
+        self.play_btn = QPushButton()
+        self.pause_btn = QPushButton()
+        self.restart_btn = QPushButton()
+
+        icon_size = QSize(48, 48)
+        self.load_btn.setToolTip("Load video from your computer")
+        self.load_btn.setIcon(QIcon(os.path.join(ICON_DIR, "load.png")))
+        self.load_btn.setIconSize(icon_size)
+
+        self.play_btn.setToolTip("Start video playback")
+        self.play_btn.setIcon(QIcon(os.path.join(ICON_DIR, "play.png")))
+        self.play_btn.setIconSize(icon_size)
+
+        self.pause_btn.setToolTip("Pause video")
+        self.pause_btn.setIcon(QIcon(os.path.join(ICON_DIR, "pause.png")))
+        self.pause_btn.setIconSize(icon_size)
+
+        self.restart_btn.setToolTip("Restart video from the beginning")
+        self.restart_btn.setIcon(QIcon(os.path.join(ICON_DIR, "restart.png")))
+        self.restart_btn.setIconSize(icon_size)
 
 
         for btn in [self.load_btn, self.play_btn, self.pause_btn, self.restart_btn]:
-            btn.setStyleSheet(button_style)
             control_layout.addWidget(btn)
 
         final_layout = QVBoxLayout()
         final_layout.addLayout(main_layout)
         final_layout.addLayout(control_layout)
 
+        self.status_label = QLabel("Ready 🔍")
+        self.status_label.setStyleSheet("font-size: 14px; color: #5E5E5E; padding: 8px; font-weight: bold;")
+        final_layout.addWidget(self.status_label)
         self.setLayout(final_layout)
 
         # Connect button actions
@@ -267,15 +309,20 @@ class LPRApp(QWidget):
                 self.reset_count()
 
             self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            self.status_label.setText("Video loaded successfully ✔️")
+        else:
+            self.status_label.setText("No video file selected ❌")
 
     def play_video(self):
         if self.cap and self.cap.isOpened():
             self.timer.start(30)
+            self.status_label.setText("Playing video ▶️")
 
     def pause_video(self):
         if self.pipeline:
             self.pipeline.pause()
         self.timer.stop()
+        self.status_label.setText("Video paused ⏸️")
 
     def reset_count(self):
         self.counted_ids.clear()
@@ -291,6 +338,7 @@ class LPRApp(QWidget):
         self.update_counts_display()
         self.update_plates_list()
         self.tracked_objects.clear()
+        self.status_label.setText("Video restarted 🔄")
 
     def next_frame(self):
         if self.cap and self.cap.isOpened():
@@ -404,8 +452,79 @@ class LPRApp(QWidget):
 
         self.pipeline.log_detection_results()
 
-if __name__ == "__main__":
+if __name__ == "__main__": 
     app = QApplication(sys.argv)
+    app.setFont(QFont("Segoe UI", 10))
+    
+    light_style = """
+    QWidget {
+        background-color: #eaf4fb;
+        color: #003B73;
+        font-family: 'Segoe UI';
+        font-size: 10pt;
+    }
+
+    QPushButton {
+        background-color: #d4eafd;
+        color: #003B73;
+        font-weight: 600;
+        padding: 10px;
+        border-radius: 10px;
+        border: 1px solid #a8cdee;
+    }
+
+    QPushButton:hover {
+        background-color: #e4f4ff;
+    }
+
+    QPushButton:pressed {
+        background-color: #bdddf5;
+    }
+
+    QLabel {
+        font-size: 12pt;
+        font-weight: 600;
+        color: #003B73;
+    }
+
+    QListWidget {
+        background-color: #ffffff;
+        border: 1px solid #c3d9ee;
+        border-radius: 6px;
+        color: #003B73;
+        font-size: 10pt;
+        padding: 6px;
+    }
+
+    QWidget#sidebar QLabel {
+    font-size: 11pt;
+    font-weight: 500;
+    color: #004a88;
+    }
+
+    QWidget#sidebar QLabel:first-child {
+        font-size: 13pt;
+        font-weight: bold;
+        margin-bottom: 10px;
+    }
+
+    QToolTip {
+        background-color: #f2fbff;
+        color: #003B73;
+        border: 1px solid #a0cbe8;
+        padding: 5px;
+        border-radius: 6px;
+        font-size: 9pt;
+    }
+
+    QWidget#sidebar {
+        background-color: #dff0fa;
+        border-right: 2px solid #bddff2;
+        padding: 12px;
+    }
+    """
+    app.setStyleSheet(light_style)
+
     window = LPRApp()
     window.show()
     sys.exit(app.exec_())
