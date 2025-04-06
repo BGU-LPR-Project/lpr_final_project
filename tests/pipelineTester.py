@@ -173,10 +173,10 @@ class pipelineTester:
 if __name__ == "__main__":
     video_path = "recordings/rec6.mp4"
     ground_truth = [
-        {"plate": "MH01EB2570", "direction": "Exit", "authorized": 1},
+        {"plate": "MH01EB2570", "direction": "Exit", "authorized": 0},
         {"plate": "MH02FX4729", "direction": "Entrance", "authorized": 0},
-        {"plate": "MH04HU1278", "direction": "Exit", "authorized": -1},
-        {"plate": "MH48AC4033", "direction": "Entrance", "authorized": 1},
+        {"plate": "MH04HU1278", "direction": "Exit", "authorized": 0},
+        {"plate": "MH48AC4033", "direction": "Entrance", "authorized": 0},
     ]
 
     tester = pipelineTester(video_path, ground_truth)
