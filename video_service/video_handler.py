@@ -1,40 +1,50 @@
 import cv2
+import time
 
 class VideoHandler:
-    def __init__(self, video_path: str):
+    def __init__(self, video_path_or_stream, target_fps=4):
         """
-        Initialize the VideoProcessor with the path to the video file.
+        Initializes the video handler for either a video file or an RTSP stream.
+        :param video_path_or_stream: Path to video file or RTSP stream URL
+        :param target_fps: Target FPS for processing (default 4)
         """
-        self.video_path: str = video_path
-        self.capture = None
+        self.video_path_or_stream = video_path_or_stream
+        self.cap = None
+        self.target_fps = target_fps
+        self.last_frame_time = time.time()
 
-    def load_video(self) -> None:
-        """
-        Load the video file and check if it is accessible.
-        """
-        self.capture = cv2.VideoCapture(self.video_path)
-        if not self.capture.isOpened():
-            raise FileNotFoundError(f"Unable to open video file: {self.video_path}")
+    def load_video(self):
+        """Loads the video or RTSP stream depending on the provided path."""
+        if self.video_path_or_stream.startswith("rtsp://"):
+            self.cap = cv2.VideoCapture(self.video_path_or_stream)
+        else:
+            self.cap = cv2.VideoCapture(self.video_path_or_stream)
 
-    def decode_frame(self, skip_frames: int = 0):
-        """
-        Decode a single frame from the video, skipping a given number of frames.
-        """
-        if self.capture is None:
-            raise ValueError("Video capture not initialized. Call load_video() first.")
+        if not self.cap.isOpened():
+            raise ValueError(f"Failed to open video or stream: {self.video_path_or_stream}")
 
-        for _ in range(skip_frames):
-            self.capture.grab()  # Skip frames without decoding them
-
-        ret, frame = self.capture.read()
+    def decode_frame(self):
+        """
+        Decodes a single frame from the video or stream.
+        Returns None if the video or stream ends.
+        """
+        ret, frame = self.cap.read()
         if not ret:
-            return None
-        return frame
+            return None  # End of video or stream
 
-    def release_resources(self) -> None:
-        """
-        Release the video file resources properly.
-        """
-        if self.capture:
-            self.capture.release()
-        print("Video processing stopped. Resources released.")
+        # Throttle the frame rate to match the target FPS
+        current_time = time.time()
+        time_since_last_frame = current_time - self.last_frame_time
+
+        # If enough time has passed since the last frame, return the current frame
+        if time_since_last_frame >= (1 / self.target_fps):
+            self.last_frame_time = current_time
+            return frame
+        else:
+            # If not enough time has passed, skip this frame and return None
+            return None
+
+    def release_resources(self):
+        """Releases the video capture object."""
+        if self.cap is not None:
+            self.cap.release()

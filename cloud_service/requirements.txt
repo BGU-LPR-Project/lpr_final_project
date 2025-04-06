@@ -1,4 +1,3 @@
-flask
 paddleocr
 numpy
 opencv-python-headless
@@ -7,3 +6,6 @@ scipy
 matplotlib
 scikit-image
 paddlepaddle
+fastapi
+uvicorn
+pydantic

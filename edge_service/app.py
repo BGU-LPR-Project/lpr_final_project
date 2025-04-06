@@ -1,18 +1,22 @@
 import base64
 import cv2
-import numpy as np
 import redis
 import threading
 import time
 import requests
 import pickle
 from concurrent.futures import ThreadPoolExecutor
-from flask import Flask, jsonify
+from fastapi import FastAPI, HTTPException
 from edge import EdgeService
-from auth_manager import AuthManager
+import logging
 
 # Constants
-THREAD_POOL_SIZE = 4  # Adjust as needed based on the number of concurrent requests you want to handle
+THREAD_POOL_SIZE = 1  # Adjust as needed based on the number of concurrent requests you want to handle
+
+# FastAPI app initialization
+app = FastAPI()
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
 
 
 def wait_for_cloud_service():
@@ -25,7 +29,7 @@ def wait_for_cloud_service():
                 break
         except requests.exceptions.RequestException:
             print("Cloud service is not yet ready, retrying...")
-        
+
         time.sleep(1)
 
 
@@ -40,72 +44,62 @@ def connect_to_redis():
         except redis.exceptions.BusyLoadingError:
             print("Waiting for Redis to load data into memory...")
             time.sleep(1)  # Retry after a short delay
-    
     return client
 
-
-def process_frame(frame, edge_service, result):
+def process_frame(frame, edge_service):
     """Process each frame using edge service and send results to cloud."""
     print("Processing frame in new thread.")
+
+    result = {}
 
     def callback(prediction):
         nonlocal result
         result = prediction
-        #print("Edge prediction callback executed with result:", result)
 
-    # Process with edge service
+    # Start async prediction
     edge_service.predict(frame, callback)
 
-    # Handle results
-    for object_id, data in result.items():
-        plate_img = data.get("plate_bbox")
-        authorization = 0  # Default unauthorized
+    # Handle results now that callback is done
+    for object_id, box in result.items():
 
-        if plate_img:
-            # Send plate image to cloud service
-            _, buffer = cv2.imencode('.jpg', frame[plate_img[1]:plate_img[3], plate_img[0]:plate_img[2]])
+        try:
+            cropped_plate = frame[box[1]:box[3], box[0]:box[2]]
+
+            _, buffer = cv2.imencode('.jpg', cropped_plate)
             encoded_plate = base64.b64encode(buffer).decode('utf-8')
 
             cloud_response = requests.post(
-                "http://cloud_service:8000/predict", json={"plate_img": encoded_plate}, verify=False).json()
-            plate_number = cloud_response.get("plate_number", "---")
+                "http://cloud_service:8000/predict",
+                json={"plate_img": encoded_plate},
+                verify=True
+            ).json()
 
-            print(plate_number)
+            ocr_text, ocr_conf = cloud_response.get("ocr_result", (str(), 0.0))
+            edge_service.update_tracked_vehicle(object_id, ocr_text, ocr_conf)
+        except Exception as e:
+            print(f"cloud predict api failed: {e}")
 
 
 def poll_queue(redis_client, executor, edge_service):
     """Poll the Redis queue and process frames asynchronously."""
     while True:
+        # logging.info(redis_client.llen("frame_queue"))
         frame_data = redis_client.lpop("frame_queue")  # Block until a frame is available
         if frame_data:
             frame = pickle.loads(frame_data)  # Deserialize the frame
-            
+
             # Use thread pool to process the frame
-            result = {}
-            executor.submit(process_frame, frame, edge_service, result)
+            process_frame(frame, edge_service)
+        edge_service.log_results()
         time.sleep(0.1)  # Periodic check if needed
 
-
-def create_flask_app():
-    """Create and configure Flask application."""
-    app = Flask(__name__)
-
-    @app.route('/healthcheck', methods=['GET'])
-    def healthcheck():
-        return "Edge service running!", 200
-
-    return app
-
-
-def main():
-    """Main function to start the services and the polling loop."""
+def start_polling():
     wait_for_cloud_service()
-    
+
     # Connect to Redis and initialize services
     redis_client = connect_to_redis()
     edge_service = EdgeService("/app/models/yolo11n.pt", "/app/models/license_plate_detector.pt")
     edge_service.on()
-    auth_manager = AuthManager(['NA13NRU'], ['GX15OGJ'])
 
     # Thread pool initialization
     executor = ThreadPoolExecutor(max_workers=THREAD_POOL_SIZE)
@@ -113,9 +107,31 @@ def main():
     # Start polling loop in a separate thread
     threading.Thread(target=poll_queue, args=(redis_client, executor, edge_service), daemon=True).start()
 
-    # Start Flask app
-    app = create_flask_app()
-    app.run(host='0.0.0.0', port=8000)
+    return {"status": "Polling started"}
+
+# FastAPI route to health check
+@app.get("/healthcheck")
+async def healthcheck():
+    return "Edge service running!", 200
+
+# Main function to run the FastAPI app
+def main():
+    wait_for_cloud_service()
+
+    # Connect to Redis and initialize services
+    redis_client = connect_to_redis()
+    edge_service = EdgeService("/app/models/yolo11n.pt", "/app/models/license_plate_detector.pt")
+    edge_service.on()
+
+    # Thread pool initialization
+    executor = ThreadPoolExecutor(max_workers=THREAD_POOL_SIZE)
+
+    # Start polling loop in a separate thread
+    threading.Thread(target=poll_queue, args=(redis_client, executor, edge_service), daemon=True).start()
+
+    # Run FastAPI app
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 
 
 if __name__ == "__main__":

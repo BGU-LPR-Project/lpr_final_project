@@ -1,10 +1,9 @@
-import cv2
+import time
 import redis
 import pickle
-import time
 import requests
 from video_handler import VideoHandler
-
+import cv2
 
 def wait_for_edge_service():
     """Waits for the edge service to become healthy."""
@@ -16,7 +15,7 @@ def wait_for_edge_service():
                 break
         except requests.exceptions.RequestException:
             print("Edge service is not yet ready, retrying...")
-        
+
         time.sleep(1)
 
 
@@ -31,7 +30,7 @@ def connect_to_redis():
         except redis.exceptions.BusyLoadingError:
             print("Waiting for Redis to load data into memory...")
             time.sleep(1)  # Retry after a short delay
-    
+    client.flushall()
     return client
 
 
@@ -41,46 +40,46 @@ def push_frame_to_redis(frame, redis_client):
         time.sleep(0.1)  # Pause briefly before checking again
     frame_data = pickle.dumps(frame)
     redis_client.rpush("frame_queue", frame_data)
-    print(f"Frame pushed to queue: {time.time()}")
 
 
-def main():
-    """Main function to handle video processing and Redis interaction."""
+def main(video_path_or_stream):
+    """Main function to handle video or RTSP stream processing and Redis interaction."""
     # Wait for edge service and Redis to be ready
     wait_for_edge_service()
     redis_client = connect_to_redis()
 
-    # Path to video
-    video_path = "/app/recordings/motion4.mp4"
-
-    # Open video capture
-    handler = VideoHandler(video_path)
+    # Open video capture (video file or RTSP stream)
+    handler = VideoHandler(video_path_or_stream, target_fps=4)  # Process at 4 FPS
     handler.load_video()
 
-    # Variable to track the last time a frame was pushed
-    last_frame_time = time.time()
-    frame_interval = 1 / 4  # 4 FPS -> 250ms per frame
+    timeout = 30  # Timeout after 30 seconds of no frames
+    last_frame_time = time.time()  # Track when the last frame was receive
 
     while True:
+        # Get a frame from the video or stream
         frame = handler.decode_frame()
+    
         if frame is None:
-            break
+            time.sleep(0.1)
+            
+            # Optionally, check if the timeout has been reached to break the loop
+            if time.time() - last_frame_time > timeout:
+                print("Timeout reached, stopping stream processing.")
+                break
+            
+            continue  # Skip if no frame available
 
-        current_time = time.time()
-        time_since_last_frame = current_time - last_frame_time
+        # Frame received, reset the timeout counter
+        last_frame_time = time.time()
+        
+        # frame = cv2.resize(frame, (800, 600), interpolation=cv2.INTER_AREA)
 
-        # If 250ms has passed since the last frame, push the frame to Redis
-        if time_since_last_frame >= frame_interval:
-            push_frame_to_redis(frame, redis_client)
-
-            # Update the last frame push time
-            last_frame_time = current_time
-        else:
-            # Sleep for the remaining time before the next frame can be pushed
-            time.sleep(frame_interval - time_since_last_frame)
+        # Process the frame (e.g., push to Redis, detect objects, etc.)
+        push_frame_to_redis(frame, redis_client)
 
     handler.release_resources()
 
 
 if __name__ == "__main__":
-    main()
+    video_path_or_stream = "/app/recordings/motion4.mp4"
+    main(video_path_or_stream)

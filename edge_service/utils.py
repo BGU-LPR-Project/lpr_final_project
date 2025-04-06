@@ -1,5 +1,7 @@
 import cv2
 import numpy as np
+from bounding_box import BoundingBox
+from typing import List
 
 def align_images(ref_image, img_to_align):
     orb = cv2.ORB_create(500)
@@ -45,3 +47,33 @@ def sharpenHBF(img: np.ndarray):
     HBF = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]], dtype=np.float32)
     a1 = cv2.filter2D(img, -1, HBF)
     return np.clip(a1, 0, 255).astype(np.uint8)
+
+def merge_boxes(boxes: List[BoundingBox]) -> List[BoundingBox]:
+        if not boxes:
+            return []
+        boxes.sort(key=lambda b: (b.y, b.x))
+        merged = [boxes[0]]
+        for current in boxes[1:]:
+            last = merged[-1]
+            if should_merge(last, current):
+                merged[-1] = last.merge_with(current)
+            else:
+                merged.append(current)
+        return merged
+
+def should_merge(box1: BoundingBox, box2: BoundingBox) -> bool:
+        threshold = min(box1.width, box1.height, box2.width, box2.height) / 4
+        close_in_x = abs((box1.x + box1.width / 2) - (box2.x + box2.width / 2)) < threshold
+        close_in_y = abs((box1.y + box1.height / 2) - (box2.y + box2.height / 2)) < threshold
+        return box1.intersects_with(box2) or (close_in_x and close_in_y and intersect_over_union(box1, box2) < 0.7)
+
+def intersect_over_union(box1: BoundingBox, box2: BoundingBox) -> float:
+        inter_x1 = max(box1.x, box2.x)
+        inter_y1 = max(box1.y, box2.y)
+        inter_x2 = min(box1.x + box1.width, box2.x + box2.width)
+        inter_y2 = min(box1.y + box1.height, box2.y + box2.height)
+        inter_area = max(0, inter_x2 - inter_x1) * max(0, inter_y2 - inter_y1)
+        box1_area = box1.width * box1.height
+        box2_area = box2.width * box2.height
+        union_area = box1_area + box2_area - inter_area
+        return inter_area / union_area if union_area > 0 else 0

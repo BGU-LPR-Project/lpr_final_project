@@ -1,5 +1,4 @@
-import datetime
-
+from datetime import datetime
 import cv2
 import numpy as np
 from ultralytics import YOLO
@@ -7,25 +6,12 @@ from tracking import CentroidTracker
 from roi import RegionAdjuster
 from collections import OrderedDict
 from typing import List
-
-class BoundingBox:
-    def __init__(self, x: int, y: int, width: int, height: int, confidence: float = 1.0):
-        self.x = x
-        self.y = y
-        self.width = width
-        self.height = height
-        self.confidence = confidence
-
-    def intersects_with(self, other: 'BoundingBox') -> bool:
-        return not (
-            self.x + self.width < other.x or
-            self.x > other.x + other.width or
-            self.y + self.height < other.y or
-            self.y > other.y + other.height
-        )
+import utils
+from bounding_box import BoundingBox
 
 class MotionDetector:
     def __init__(self):
+        # self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=30, detectShadows=True)
         self.prev_frame = None
 
     def detect_motion(self, frame: np.ndarray) -> List[BoundingBox]:
@@ -45,12 +31,15 @@ class MotionDetector:
         contours, _ = cv2.findContours(motion_mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         bounding_boxes = []
         for contour in contours:
-            if cv2.contourArea(contour) > 2500:
+            if cv2.contourArea(contour) > 2500:  # Filter by area
                 x, y, w, h = cv2.boundingRect(contour)
                 bounding_boxes.append(BoundingBox(x, y, w, h))
 
         self.prev_frame = gray
-        return bounding_boxes
+        
+        merged_boxes = utils.merge_boxes(bounding_boxes)
+        
+        return merged_boxes
 
 class EdgeService:
     def __init__(self, car_model_path, plate_model_path, confidence_threshold=0.5):
@@ -77,16 +66,18 @@ class EdgeService:
             roi_frame = frame #self.region_adjuster.apply_roi_mask(frame)
             motion_boxes = self.motion_detector.detect_motion(roi_frame)
             detected_cars = self.detect_moving_cars(roi_frame, motion_boxes)
-            detected_objects = self.detect_license_plate_boxes(roi_frame, detected_cars)
+            detected_plates = self.detect_license_plate_boxes(roi_frame, detected_cars)
 
-            CB(detected_objects)
+            CB(detected_plates)
 
         except Exception as e:
             print("Edge service error:", e)
             CB(OrderedDict())
 
     def detect_moving_cars(self, frame, motion_boxes):
+
         results = self.car_model(frame)[0].boxes
+            
         detections = []
 
         for box in results:
@@ -106,8 +97,10 @@ class EdgeService:
         return tracked_cars
 
     def detect_license_plate_boxes(self, frame, detected_cars):
+
         plates_results = self.plate_model(frame)[0].boxes
 
+        car_plates = {}
         for plate in plates_results:
             confidence = plate.conf[0].item()
             class_id = int(plate.cls[0].item())
@@ -117,10 +110,10 @@ class EdgeService:
                 plate_box = BoundingBox(int(x1), int(y1), int(x2 - x1), int(y2 - y1), confidence)
                 best_match_car_id = self.match_plate_to_car(plate_box, detected_cars)
 
-                if best_match_car_id is not None:
-                    detected_cars[best_match_car_id]["plate_bbox"] = (int(x1), int(y1), int(x2), int(y2))
+                if best_match_car_id is not None and not self.tracker.objects[best_match_car_id]["done"]:
+                    car_plates[best_match_car_id] = (int(x1), int(y1), int(x2), int(y2))
 
-        return detected_cars
+        return car_plates
 
     def match_plate_to_car(self, plate_box, detected_cars):
         best_match_car_id = None
@@ -153,3 +146,26 @@ class EdgeService:
         )
 
         return vertically_aligned and horizontally_aligned
+    
+    def update_tracked_vehicle(self, vehicle_id, ocr_text, ocr_confidence):
+        vehicle_details = self.tracker.objects[vehicle_id]
+        prev_plate_number = vehicle_details["plate_number"]
+        prev_confidence = vehicle_details["confidence"]
+        occurs = vehicle_details["occurs"]
+
+        if ocr_text and (ocr_confidence > prev_confidence): 
+            vehicle_details['plate_number'] = ocr_text
+            vehicle_details["confidence"] = ocr_confidence
+            vehicle_details["last_timestamp"] = datetime.now()
+            if prev_plate_number == ocr_text:
+                vehicle_details["occurs"] = occurs + 1
+            else:
+                vehicle_details["occurs"] = 0
+            vehicle_details["done"] =  vehicle_details["occurs"] >= 3
+            self.tracker.update_tracked_plate(vehicle_id, ocr_text)
+
+    def log_results(self):
+        print("LOGGING CURRENT RESULTS:")
+        for object_id, plate in self.tracker.tracked_plates.items():
+            print(f"ID: {object_id} - Plate: {plate}")
+
