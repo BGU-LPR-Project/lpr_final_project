@@ -111,10 +111,12 @@ class pipelineTester:
                     partial_matches.append((plate, best_match["plate"], best_ratio))
 
 
-                if best_ratio >= self.partial_match_threshold:
+                if best_ratio >= self.partial_match_threshold and gt_counts[best_match["plate"]] > 0:
                     tp += 1
+                    gt_counts[best_match["plate"]] -= 1
                 else:
                     fp += 1
+
 
         fn = sum(gt_counts.values())
 
@@ -129,7 +131,9 @@ class pipelineTester:
         print(f"Precision: {precision:.2f}, Recall: {recall:.2f}, F1 Score: {f1:.2f}")
 
         if self.check_direction:
-            print(f"Direction Accuracy: {correct_dirs}/{tp} = {correct_dirs / tp if tp > 0 else 0:.2f}")
+            print(f"Direction Accuracy (for TP): {correct_dirs}/{tp} = {correct_dirs / tp if tp > 0 else 0:.2f}")
+            # print(f"Direction Accuracy: {correct_dirs}/{len(detected)} = {correct_dirs / len(detected) if detected else 0:.2f}")
+
 
 
             print("\nDirection Comparison per Plate:")
