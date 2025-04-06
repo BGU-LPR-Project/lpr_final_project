@@ -129,6 +129,8 @@ class pipelineTester:
                     fp += 1
 
 
+
+
         fn = sum(gt_counts.values())
 
         precision = tp / (tp + fp) if (tp + fp) > 0 else 0
@@ -142,7 +144,7 @@ class pipelineTester:
         print(f"Precision: {precision:.2f}, Recall: {recall:.2f}, F1 Score: {f1:.2f}")
 
         if self.check_direction:
-            print(f"Direction Accuracy (for TP): {correct_dirs}/{tp} = {correct_dirs / tp if tp > 0 else 0:.2f}")
+            print(f"Direction Accuracy (for fully matched plates): {correct_dirs}/{tp} = {correct_dirs / tp if tp > 0 else 0:.2f}")
             # print(f"Direction Accuracy: {correct_dirs}/{len(detected)} = {correct_dirs / len(detected) if detected else 0:.2f}")
 
 
@@ -153,14 +155,14 @@ class pipelineTester:
             for plate, expected, actual, note in direction_comparisons:
                 print(f"Plate: {plate} | Expected: {expected} | Detected: {actual} | {note}")
 
-        print(f"Authorization Accuracy: {correct_auth}/{len(detected)} = {correct_auth / len(detected) if detected else 0:.2f}")
+        print(f"Authorization Accuracy (for fully matched plates): {correct_auth}/{len(detected)} = {correct_auth / len(detected) if detected else 0:.2f}")
         print("\nAuthorization Comparison per Plate:")
         for plate, expected, actual, note in auth_comparisons:
             print(f"Plate: {plate} | Expected: {expected} | Detected: {actual} | {note}")
 
         if self.check_tracking:
             consistent = sum(len(ids) == 1 for ids in id_map.values())
-            print(f"Tracking Consistency: {consistent}/{len(id_map)} unique IDs per plate")
+            print(f"Tracking Consistency (for fully matched plates): {consistent}/{len(id_map)} unique IDs per plate")
 
         if partial_matches:
             print("\nPartial Matches:")
