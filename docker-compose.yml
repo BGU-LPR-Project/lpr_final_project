@@ -1,0 +1,51 @@
+version: '3'
+services:
+  video_service:
+    build: ./video_service
+    container_name: video-service
+    volumes:
+      - ./recordings:/app/recordings
+    ports:
+      - "8000:8000" # Expose for frame retrieval
+    depends_on:
+      - redis
+    networks:
+      - app_network
+
+  edge_service:
+    build: ./edge_service
+    container_name: edge-service
+    volumes:
+      - ./models:/app/models # Make sure this points to the correct local directory
+    ports:
+      - "8001:8000" # Expose for frame processing
+    depends_on:
+      - redis
+    networks:
+      - app_network
+    command: python -m memory_profiler app.py
+
+  redis:
+    image: "redis:alpine"
+    container_name: redis-container # optional: name your container
+    networks:
+      - app_network
+    ports:
+      - "6379:6379" # optional: expose port 6379 to host machine
+    restart: always # optional: restart policy in case the container stops
+
+  cloud_service:
+    build: ./cloud_service
+    container_name: cloud-service
+    volumes:
+      - ./models:/app/models # Make sure this points to the correct local directory
+    ports:
+      - "8002:8000" # Expose for cloud interactions
+    depends_on:
+      - edge_service
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge

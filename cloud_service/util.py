@@ -4,6 +4,7 @@ from matplotlib import pyplot as plt
 from skimage.filters import threshold_niblack, threshold_sauvola
 from collections import defaultdict
 
+
 def align_images(ref_image, img_to_align):
     """Aligns img_to_align to ref_image using only translation (small shifts)."""
     orb = cv2.ORB_create(500)  # Feature detector
@@ -43,6 +44,7 @@ def align_images(ref_image, img_to_align):
 
     return aligned_img
 
+
 def resize_plate(plate: np.ndarray):
     image = plate
 
@@ -71,15 +73,16 @@ def resize_plate(plate: np.ndarray):
     # Calculate padding offsets to center the image
     x_offset = (new_width - resized_width) // 2
     y_offset = (new_height - resized_height) // 2
-    
+
     # Place the resized image in the center
-    final_image[y_offset:y_offset+resized_height, x_offset:x_offset+resized_width] = resized_image
+    final_image[y_offset:y_offset + resized_height, x_offset:x_offset + resized_width] = resized_image
 
     return final_image
 
+
 def fuse_thresholded_images(thresholded_images):
     """Aligns and fuses the last 5 thresholded images to enhance clarity."""
-    
+
     # Ensure we have at least 5 images
     num_images = len(thresholded_images)
     if num_images < 2:
@@ -102,15 +105,16 @@ def fuse_thresholded_images(thresholded_images):
 
     return fused_image
 
+
 def sharpenLAP(img: np.ndarray):
     # Define the Laplacian filters
-    Lap = np.array([[0, 1, 0], 
-                    [1, -4, 1], 
+    Lap = np.array([[0, 1, 0],
+                    [1, -4, 1],
                     [0, 1, 0]], dtype=np.float32)
 
-    strong_Lap = np.array([[-1, -1, -1], 
-                            [-1,  8, -1], 
-                            [-1, -1, -1]], dtype=np.float32)
+    strong_Lap = np.array([[-1, -1, -1],
+                           [-1, 8, -1],
+                           [-1, -1, -1]], dtype=np.float32)
 
     # Apply convolution with Laplacian filter
     a1 = cv2.filter2D(img, -1, Lap)
@@ -128,15 +132,16 @@ def sharpenLAP(img: np.ndarray):
 
     return sharpened2
 
+
 def sharpenHBF(img: np.ndarray):
     # Define the High Boost Filters (HBF)
-    HBF = np.array([[0, -1,  0], 
-                    [-1,  5, -1], 
-                    [0, -1,  0]], dtype=np.float32)  # Central value = 5
+    HBF = np.array([[0, -1, 0],
+                    [-1, 5, -1],
+                    [0, -1, 0]], dtype=np.float32)  # Central value = 5
 
-    SHBF = np.array([[-1, -1, -1], 
-                    [-1,  9, -1], 
-                    [-1, -1, -1]], dtype=np.float32)  # Central value = 9
+    SHBF = np.array([[-1, -1, -1],
+                     [-1, 9, -1],
+                     [-1, -1, -1]], dtype=np.float32)  # Central value = 9
 
     # Apply convolution with High Boost Filters
     a1 = cv2.filter2D(img, -1, HBF)
@@ -146,7 +151,6 @@ def sharpenHBF(img: np.ndarray):
     a4 = np.clip(a3, 0, 255).astype(np.uint8)  # Normalize intensity
 
     return a2
-
 
 
 def multi_threshold_plate(plate):
@@ -160,7 +164,7 @@ def multi_threshold_plate(plate):
 
     # Apply different thresholding methods
     _, otsu_thresh = cv2.threshold(enhanced_image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    adaptive_thresh = cv2.adaptiveThreshold(enhanced_image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+    adaptive_thresh = cv2.adaptiveThreshold(enhanced_image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
                                             cv2.THRESH_BINARY, 21, 5)
 
     # Apply Niblack and Sauvola thresholding (LESS AGGRESSIVE)
@@ -180,8 +184,8 @@ def multi_threshold_plate(plate):
 
     # Apply morphological opening (LESS AGGRESSIVE)
     kernel = np.ones((2, 2), np.uint8)  # Changed from (3,3) → (2,2)
-    cleaned_thresh = cv2.morphologyEx(merged_thresh, cv2.MORPH_OPEN, kernel)   
-        
+    cleaned_thresh = cv2.morphologyEx(merged_thresh, cv2.MORPH_OPEN, kernel)
+
     edges = cv2.Canny(plate, 100, 200)  # You can adjust the thresholds (100, 200) for fine-tuning
     refined_image = cv2.bitwise_and(cleaned_thresh, cleaned_thresh, mask=cv2.bitwise_not(edges))
 

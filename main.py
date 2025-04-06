@@ -1,11 +1,9 @@
 from typing import Dict
-import cv2
-from datetime import datetime
-from video_handler import VideoHandler
-from edge import *
-from cloud import *
-from roi import RegionAdjuster
-from auth_manager import AuthManager
+from video_service.video_handler import VideoHandler
+from edge_service.edge import *
+from cloud_service.cloud import *
+from edge_service.roi import RegionAdjuster
+from edge_service.auth_manager import AuthManager
 
 class LicensePlate:
     """

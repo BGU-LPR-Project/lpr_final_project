@@ -8,8 +8,8 @@ from typing import List
 # Dynamically add the project root directory to sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from edge import MotionDetector, BoundingBox
-from cloud import CarDetector, LicensePlateDetector
+from edge_service.edge import MotionDetector, BoundingBox
+from cloud_service.cloud import CarDetector
 
 
 def test_motion_detection_with_annotations(model, frames_path, annotations_path, task):

@@ -1,0 +1,12 @@
+opencv-python-headless
+ultralytics
+numpy
+scipy
+matplotlib
+scikit-image
+requests
+redis
+fastapi
+uvicorn
+pydantic
+memory_profiler

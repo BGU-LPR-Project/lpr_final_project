@@ -9,17 +9,20 @@ class CentroidTracker:
         self.objects = OrderedDict()  # Stores object details (centroid, bounding box, plate number)
         self.disappeared = OrderedDict()
         self.max_disappeared = max_disappeared
+        self.tracked_plates = OrderedDict()
 
     def register(self, centroid, bbox):
         """Assign a new ID to a detected object."""
         self.objects[self.next_object_id] = {
             "centroid": centroid,
             "bbox": bbox,
-            "plate_number": "---",
+            "plate_number": str(),
+            "plate_box": None,
             "direction": None,
             "confidence": 0.0,
             "last_timestamp": datetime.now(),
             "occurs": 0,
+            "done": False,
         }
         self.disappeared[self.next_object_id] = 0
         self.next_object_id += 1
@@ -120,3 +123,6 @@ class CentroidTracker:
             idxs = np.delete(idxs, np.concatenate(([last], np.where(overlap > overlap_thresh)[0])))
 
         return boxes[pick].astype("int")
+    
+    def update_tracked_plate(self, object_id, plate_number):
+        self.tracked_plates[object_id] = plate_number
