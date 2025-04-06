@@ -60,9 +60,12 @@ class pipelineTester:
         correct_dirs = 0
         id_map = defaultdict(set)
         partial_matches = []
+        direction_comparisons = []
+
 
         for pred in detected:
             plate = pred["plate"]
+            actual_dir = pred["direction"]
             matched = False
 
             if plate in gt_counts and gt_counts[plate] > 0:
@@ -70,11 +73,22 @@ class pipelineTester:
                 gt_counts[plate] -= 1
                 matched = True
 
-                if self.check_direction:
-                    for gt in self.ground_truth:
-                        if gt["plate"] == plate and gt["direction"] == pred["direction"]:
-                            correct_dirs += 1
-                            break
+                # if self.check_direction:
+                #     for gt in self.ground_truth:
+                #         if gt["plate"] == plate and gt["direction"] == pred["direction"]:
+                #             correct_dirs += 1
+                #             break
+
+
+                expected_dir = next((gt["direction"] for gt in self.ground_truth if gt["plate"] == plate), None)
+                # actual_dir = pred["direction"]
+                # direction_comparisons.append((plate, expected_dir, actual_dir))
+                direction_comparisons.append((plate, expected_dir, actual_dir, "Exact"))
+
+
+                if self.check_direction and expected_dir == actual_dir:
+                    correct_dirs += 1
+
 
                 if self.check_tracking:
                     id_map[plate].add(pred["object_id"])
@@ -85,10 +99,17 @@ class pipelineTester:
                     ratio = difflib.SequenceMatcher(None, plate or "", gt["plate"] or "").ratio()
                     if ratio > best_ratio:
                         best_ratio = ratio
-                        best_match = gt["plate"]
+                        # best_match = gt["plate"]
+                        best_match = gt
+
+                if best_match:
+                    direction_comparisons.append((plate, best_match.get("direction"), actual_dir, f"Closest match: {best_match['plate']} ({best_ratio:.2f})"))
+
 
                 if best_ratio >= 0.6:
-                    partial_matches.append((plate, best_match, best_ratio))
+                    # partial_matches.append((plate, best_match, best_ratio))
+                    partial_matches.append((plate, best_match["plate"], best_ratio))
+
 
                 if best_ratio >= self.partial_match_threshold:
                     tp += 1
@@ -110,6 +131,14 @@ class pipelineTester:
         if self.check_direction:
             print(f"Direction Accuracy: {correct_dirs}/{tp} = {correct_dirs / tp if tp > 0 else 0:.2f}")
 
+
+            print("\nDirection Comparison per Plate:")
+            # for plate, expected, actual in direction_comparisons:
+            #     print(f"Plate: {plate} | Expected: {expected} | Detected: {actual}")
+            for plate, expected, actual, note in direction_comparisons:
+                print(f"Plate: {plate} | Expected: {expected} | Detected: {actual} | {note}")
+
+
         if self.check_tracking:
             consistent = sum(len(ids) == 1 for ids in id_map.values())
             print(f"Tracking Consistency: {consistent}/{len(id_map)} unique IDs per plate")
@@ -125,10 +154,10 @@ class pipelineTester:
 if __name__ == "__main__":
     video_path = "recordings/rec6.mp4"
     ground_truth = [
-        {"plate": "MH01EB2570", "direction": "Entrance"},
-        {"plate": "MH02FX4729", "direction": "Exit"},
-        {"plate": "MH04HU1278", "direction": "Entrance"},
-        {"plate": "MH48AC4033", "direction": "Exit"},
+        {"plate": "MH01EB2570", "direction": "Exit"},
+        {"plate": "MH02FX4729", "direction": "Entrance"},
+        {"plate": "MH04HU1278", "direction": "Exit"},
+        {"plate": "MH48AC4033", "direction": "Entrance"},
     ]
 
     tester = pipelineTester(video_path, ground_truth)
