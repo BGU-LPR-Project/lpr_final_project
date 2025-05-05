@@ -11,8 +11,18 @@ from bounding_box import BoundingBox
 import redis
 import pickle
 
-redis_client = redis.StrictRedis(host='redis', port=6379, db=0)
-redis_client.set("tracked_plates", pickle.dumps([(oid, v["plate_number"], v["confidence"]) for oid, v in self.tracker.objects.items()]))
+
+# # Wait until Redis is ready
+# while True:
+#     try:
+#         self.redis_client.ping()
+#         break
+#     except redis.exceptions.BusyLoadingError:
+#         print("Redis is still loading... waiting 1s")
+#         time.sleep(1)
+
+# # Now safe to call commands like flushall
+# redis_client.flushall()
 
 
 class MotionDetector:
@@ -171,6 +181,8 @@ class EdgeService:
             self.tracker.update_tracked_plate(vehicle_id, ocr_text)
 
     def log_results(self):
+        redis_client = redis.StrictRedis(host='redis', port=6379, db=0)
+        redis_client.set("tracked_plates", pickle.dumps([(oid, v["plate_number"], v["confidence"]) for oid, v in self.tracker.objects.items()]))
 
         print("LOGGING CURRENT RESULTS:")
         redis_client = redis.StrictRedis(host='redis', port=6379, db=0)
