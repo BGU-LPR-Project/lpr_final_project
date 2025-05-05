@@ -11,7 +11,6 @@ from bounding_box import BoundingBox
 
 class MotionDetector:
     def __init__(self):
-        # self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=30, detectShadows=True)
         self.prev_frame = None
 
     def detect_motion(self, frame: np.ndarray) -> List[BoundingBox]:
@@ -59,7 +58,7 @@ class EdgeService:
 
     def predict(self, frame, CB):
         if not self.active:
-            CB(None)
+            CB(OrderedDict())
             return
 
         try:
@@ -169,3 +168,40 @@ class EdgeService:
         for object_id, plate in self.tracker.tracked_plates.items():
             print(f"ID: {object_id} - Plate: {plate}")
 
+    def visualize(self, frame: np.ndarray, authorized: bool):
+        original_h, original_w = frame.shape[:2]
+        new_h = 600
+        new_w = 800
+
+        # Resize the frame first
+        resized_frame = cv2.resize(frame, (new_w, new_h))
+
+        # Compute scale factors
+        scale_x = new_w / original_w
+        scale_y = new_h / original_h
+
+        for object_id, data in self.tracker.objects.items():
+            centroid = data["centroid"]
+            bbox = data["bbox"]
+            plate_number = data["plate_number"]
+            plate_confidence = data["confidence"]
+            direction = data["direction"]
+
+            # Scale coordinates
+            x1, y1, x2, y2 = [int(coord * scale) for coord, scale in zip(bbox, [scale_x, scale_y, scale_x, scale_y])]
+            cx, cy = int(centroid[0] * scale_x), int(centroid[1] * scale_y)
+
+            box_color = (0, 255, 0) if authorized == 1 else ((0, 0, 255) if authorized == -1 else (0, 0, 255))
+
+            # Draw on the resized frame
+            cv2.rectangle(resized_frame, (x1, y1), (x2, y2), box_color, 2)
+            cv2.circle(resized_frame, (cx, cy), 5, box_color, -1)
+            text = f"ID {object_id} - {direction}"
+            cv2.putText(resized_frame, text, (cx - 10, cy - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, box_color, 2)
+
+            if plate_number:
+                cv2.putText(resized_frame, f"Plate: {plate_number} - {plate_confidence:.2f}", (x1, y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+
+        return resized_frame

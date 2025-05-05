@@ -5,18 +5,35 @@ import threading
 import time
 import requests
 import pickle
-from concurrent.futures import ThreadPoolExecutor
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from edge import EdgeService
 import logging
+from queue import Queue
+import uvicorn
+
+VISUAL_FRAME_QUEUE = "visual_frame_queue"
+
+COOLDOWN = threading.Event()
 
 # Constants
-THREAD_POOL_SIZE = 1  # Adjust as needed based on the number of concurrent requests you want to handle
+FRAME_QUEUE = Queue(maxsize=100)  # Limit to control memory usage
 
 # FastAPI app initialization
 app = FastAPI()
-
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
+
+def trigger_cooldown(edge_service):
+    if not COOLDOWN.is_set():
+        def cooldown_logic():
+            print("Cooldown started.")
+            COOLDOWN.set()
+            edge_service.off()
+            time.sleep(1)
+            edge_service.on()
+            COOLDOWN.clear()
+            print("Cooldown ended.")
+
+        threading.Thread(target=cooldown_logic, daemon=True).start()
 
 
 def wait_for_cloud_service():
@@ -29,7 +46,6 @@ def wait_for_cloud_service():
                 break
         except requests.exceptions.RequestException:
             print("Cloud service is not yet ready, retrying...")
-
         time.sleep(1)
 
 
@@ -38,33 +54,28 @@ def connect_to_redis():
     client = redis.StrictRedis(host='redis', port=6379, db=0)
     while True:
         try:
-            # Check if Redis is ready to accept commands
             client.ping()
             break
         except redis.exceptions.BusyLoadingError:
             print("Waiting for Redis to load data into memory...")
-            time.sleep(1)  # Retry after a short delay
+            time.sleep(1)
     return client
+
 
 def process_frame(frame, edge_service):
     """Process each frame using edge service and send results to cloud."""
-    print("Processing frame in new thread.")
-
+    print("Processing frame in worker thread.")
     result = {}
 
     def callback(prediction):
         nonlocal result
         result = prediction
 
-    # Start async prediction
     edge_service.predict(frame, callback)
 
-    # Handle results now that callback is done
     for object_id, box in result.items():
-
         try:
             cropped_plate = frame[box[1]:box[3], box[0]:box[2]]
-
             _, buffer = cv2.imencode('.jpg', cropped_plate)
             encoded_plate = base64.b64encode(buffer).decode('utf-8')
 
@@ -76,61 +87,83 @@ def process_frame(frame, edge_service):
 
             ocr_text, ocr_conf = cloud_response.get("ocr_result", (str(), 0.0))
             edge_service.update_tracked_vehicle(object_id, ocr_text, ocr_conf)
+
+            # Trigger cooldown after successful recognition
+            # trigger_cooldown(edge_service)
         except Exception as e:
             print(f"cloud predict api failed: {e}")
+    annotated_frame = edge_service.visualize(frame, True)
+    redis_client.rpush(VISUAL_FRAME_QUEUE, pickle.dumps(annotated_frame))
 
 
-def poll_queue(redis_client, executor, edge_service):
-    """Poll the Redis queue and process frames asynchronously."""
+def poll_queue(redis_client, edge_service):
+    """Poll the Redis queue and enqueue frames for processing."""
     while True:
-        # logging.info(redis_client.llen("frame_queue"))
-        frame_data = redis_client.lpop("frame_queue")  # Block until a frame is available
+        frame_data = redis_client.lpop("frame_queue")
         if frame_data:
-            frame = pickle.loads(frame_data)  # Deserialize the frame
+            frame = pickle.loads(frame_data)
+            try:
+                FRAME_QUEUE.put(frame, timeout=0.1)
+            except:
+                print("Frame queue is full. Dropping frame.")
+        # edge_service.log_results()
+        # time.sleep(0.1)
 
-            # Use thread pool to process the frame
+
+def frame_worker(edge_service):
+    """Worker thread to consume frames and process them."""
+    while True:
+        frame = FRAME_QUEUE.get()
+        if COOLDOWN.is_set():
+            print("Cooldown active. Dropping frame.")
+            FRAME_QUEUE.task_done()
+            continue
+
+        try:
             process_frame(frame, edge_service)
-        edge_service.log_results()
-        time.sleep(0.1)  # Periodic check if needed
+        except Exception as e:
+            print(f"Error processing frame: {e}")
+        finally:
+            FRAME_QUEUE.task_done()
+
 
 def start_polling():
     wait_for_cloud_service()
 
-    # Connect to Redis and initialize services
     redis_client = connect_to_redis()
     edge_service = EdgeService("/app/models/yolo11n.pt", "/app/models/license_plate_detector.pt")
     edge_service.on()
 
-    # Thread pool initialization
-    executor = ThreadPoolExecutor(max_workers=THREAD_POOL_SIZE)
-
-    # Start polling loop in a separate thread
-    threading.Thread(target=poll_queue, args=(redis_client, executor, edge_service), daemon=True).start()
+    # Start the worker thread and polling thread
+    threading.Thread(target=frame_worker, args=(edge_service,), daemon=True).start()
+    threading.Thread(target=poll_queue, args=(redis_client, edge_service), daemon=True).start()
 
     return {"status": "Polling started"}
 
-# FastAPI route to health check
+
 @app.get("/healthcheck")
 async def healthcheck():
     return "Edge service running!", 200
 
-# Main function to run the FastAPI app
+
 def main():
     wait_for_cloud_service()
 
-    # Connect to Redis and initialize services
+    global redis_client
     redis_client = connect_to_redis()
     edge_service = EdgeService("/app/models/yolo11n.pt", "/app/models/license_plate_detector.pt")
     edge_service.on()
 
-    # Thread pool initialization
-    executor = ThreadPoolExecutor(max_workers=THREAD_POOL_SIZE)
+    # Start the worker thread and polling thread
+    NUM_WORKERS = 4  # Adjust based on your CPU and memory capacity
 
-    # Start polling loop in a separate thread
-    threading.Thread(target=poll_queue, args=(redis_client, executor, edge_service), daemon=True).start()
+    # Start multiple frame processing workers
+    for _ in range(NUM_WORKERS):
+        threading.Thread(target=frame_worker, args=(edge_service,), daemon=True).start()
+    
+    threading.Thread(target=poll_queue, args=(redis_client, edge_service), daemon=True).start()
 
     # Run FastAPI app
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
 

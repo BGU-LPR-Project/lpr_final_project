@@ -3,7 +3,6 @@ import redis
 import pickle
 import requests
 from video_handler import VideoHandler
-import cv2
 
 def wait_for_edge_service():
     """Waits for the edge service to become healthy."""
@@ -36,8 +35,6 @@ def connect_to_redis():
 
 def push_frame_to_redis(frame, redis_client):
     """Serializes and pushes the frame to Redis."""
-    while redis_client.llen("frame_queue") >= 30:
-        time.sleep(0.1)  # Pause briefly before checking again
     frame_data = pickle.dumps(frame)
     redis_client.rpush("frame_queue", frame_data)
 
