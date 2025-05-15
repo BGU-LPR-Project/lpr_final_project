@@ -8,6 +8,22 @@ from collections import OrderedDict
 from typing import List
 import utils
 from bounding_box import BoundingBox
+import redis
+import pickle
+
+
+# # Wait until Redis is ready
+# while True:
+#     try:
+#         self.redis_client.ping()
+#         break
+#     except redis.exceptions.BusyLoadingError:
+#         print("Redis is still loading... waiting 1s")
+#         time.sleep(1)
+
+# # Now safe to call commands like flushall
+# redis_client.flushall()
+
 
 class MotionDetector:
     def __init__(self):
@@ -36,9 +52,9 @@ class MotionDetector:
                 bounding_boxes.append(BoundingBox(x, y, w, h))
 
         self.prev_frame = gray
-        
+
         merged_boxes = utils.merge_boxes(bounding_boxes)
-        
+
         return merged_boxes
 
 class EdgeService:
@@ -77,7 +93,7 @@ class EdgeService:
     def detect_moving_cars(self, frame, motion_boxes):
 
         results = self.car_model(frame)[0].boxes
-            
+
         detections = []
 
         for box in results:
@@ -146,14 +162,14 @@ class EdgeService:
         )
 
         return vertically_aligned and horizontally_aligned
-    
+
     def update_tracked_vehicle(self, vehicle_id, ocr_text, ocr_confidence):
         vehicle_details = self.tracker.objects[vehicle_id]
         prev_plate_number = vehicle_details["plate_number"]
         prev_confidence = vehicle_details["confidence"]
         occurs = vehicle_details["occurs"]
 
-        if ocr_text and (ocr_confidence > prev_confidence): 
+        if ocr_text and (ocr_confidence > prev_confidence):
             vehicle_details['plate_number'] = ocr_text
             vehicle_details["confidence"] = ocr_confidence
             vehicle_details["last_timestamp"] = datetime.now()
@@ -165,7 +181,15 @@ class EdgeService:
             self.tracker.update_tracked_plate(vehicle_id, ocr_text)
 
     def log_results(self):
+        redis_client = redis.StrictRedis(host='redis', port=6379, db=0)
+        redis_client.set("tracked_plates", pickle.dumps([(oid, v["plate_number"], v["confidence"]) for oid, v in self.tracker.objects.items()]))
+
         print("LOGGING CURRENT RESULTS:")
+        redis_client = redis.StrictRedis(host='redis', port=6379, db=0)
+        redis_client.set("tracked_plates", pickle.dumps([
+            (object_id, v["plate_number"], v["confidence"])
+            for object_id, v in self.tracker.objects.items()
+            if v["plate_number"]
+        ]))
         for object_id, plate in self.tracker.tracked_plates.items():
             print(f"ID: {object_id} - Plate: {plate}")
-
