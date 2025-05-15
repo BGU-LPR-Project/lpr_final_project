@@ -7,6 +7,8 @@ PLATE_FORMATS = {
     "EU_STANDARD": "[A-Z]{2}\d{4}[A-Z]{2}",  # Example: AB1234CD
     "ITALY_STANDARD": "[A-Z]{2}\d{2}[A-Z]{3}",  # Example: AB12CDE
     "INDIA_STANDARD": "[A-Z]{2}\d{2}[A-Z]{2}\d{4}",
+    "ISRAEL_STANDARD1": "\d{8}",
+    "ISRAEL_STANDARD2": "\d{7}", 
 }
 
 # Mapping of visually similar characters
@@ -64,8 +66,12 @@ def correct_plate(plate_text: str) -> Optional[str]:
     return None  # No valid correction found
 
 def process_plate(plate_text: str) -> Optional[str]:
-    """Validates a plate or attempts to correct it."""
-    valid_plate = validate_plate(plate_text)
+    """Cleans, validates, or attempts to correct a license plate."""
+    
+    # Clean input: remove all non-alphanumeric characters
+    cleaned_text = re.sub(r"[^A-Za-z0-9]", "", plate_text)
+
+    valid_plate = validate_plate(cleaned_text)
     if valid_plate:
         return valid_plate
     

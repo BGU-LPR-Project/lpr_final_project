@@ -4,14 +4,13 @@ import numpy as np
 from ultralytics import YOLO
 from tracking import CentroidTracker
 from roi import RegionAdjuster
-from collections import OrderedDict
 from typing import List
+import threading
 import utils
 from bounding_box import BoundingBox
 
 class MotionDetector:
     def __init__(self):
-        # self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=30, detectShadows=True)
         self.prev_frame = None
 
     def detect_motion(self, frame: np.ndarray) -> List[BoundingBox]:
@@ -42,7 +41,7 @@ class MotionDetector:
         return merged_boxes
 
 class EdgeService:
-    def __init__(self, car_model_path, plate_model_path, confidence_threshold=0.5):
+    def __init__(self, car_model_path, plate_model_path, confidence_threshold=0.2):
         self.motion_detector = MotionDetector()
         self.car_model = YOLO(car_model_path)
         self.plate_model = YOLO(plate_model_path)
@@ -50,6 +49,7 @@ class EdgeService:
         self.region_adjuster = RegionAdjuster(800, 600)
         self.confidence_threshold = confidence_threshold
         self.active = False
+        self.lock = threading.RLock()  
 
     def off(self):
         self.active = False
@@ -59,7 +59,7 @@ class EdgeService:
 
     def predict(self, frame, CB):
         if not self.active:
-            CB(None)
+            CB(dict())
             return
 
         try:
@@ -71,10 +71,14 @@ class EdgeService:
             CB(detected_plates)
 
         except Exception as e:
-            print("Edge service error:", e)
-            CB(OrderedDict())
+            print("Edge prediction error:", e)
+            CB(dict())
 
     def detect_moving_cars(self, frame, motion_boxes):
+
+        if len(motion_boxes) == 0:
+            tracked_cars = self.tracker.update([])
+            return tracked_cars
 
         results = self.car_model(frame)[0].boxes
             
@@ -88,15 +92,19 @@ class EdgeService:
             detected_car_box = BoundingBox(x1, y1, x2 - x1, y2 - y1, confidence)
             if confidence > self.confidence_threshold and class_id in [2, 3, 5, 7]:
                 for motion_box in motion_boxes:
-                    if detected_car_box.intersects_with(motion_box):
+                    if utils.intersect_over_union(detected_car_box, motion_box) >= 0.5:
                         detections.append((x1, y1, x2, y2))
                         break
 
         filtered_detections = self.tracker.non_max_suppression_fast(detections)
         tracked_cars = self.tracker.update(filtered_detections)
+
         return tracked_cars
 
     def detect_license_plate_boxes(self, frame, detected_cars):
+
+        if len(detected_cars.items()) == 0:
+            return {}
 
         plates_results = self.plate_model(frame)[0].boxes
 
@@ -153,7 +161,7 @@ class EdgeService:
         prev_confidence = vehicle_details["confidence"]
         occurs = vehicle_details["occurs"]
 
-        if ocr_text and (ocr_confidence > prev_confidence): 
+        if ocr_text and (ocr_confidence >= prev_confidence): 
             vehicle_details['plate_number'] = ocr_text
             vehicle_details["confidence"] = ocr_confidence
             vehicle_details["last_timestamp"] = datetime.now()
@@ -161,7 +169,7 @@ class EdgeService:
                 vehicle_details["occurs"] = occurs + 1
             else:
                 vehicle_details["occurs"] = 0
-            vehicle_details["done"] =  vehicle_details["occurs"] >= 3
+            vehicle_details["done"] =  vehicle_details["occurs"] >= 2
             self.tracker.update_tracked_plate(vehicle_id, ocr_text)
 
     def log_results(self):
@@ -169,3 +177,40 @@ class EdgeService:
         for object_id, plate in self.tracker.tracked_plates.items():
             print(f"ID: {object_id} - Plate: {plate}")
 
+    def visualize(self, frame: np.ndarray, authorized: bool):
+        original_h, original_w = frame.shape[:2]
+        new_h = 600
+        new_w = 800
+
+        # Resize the frame first
+        resized_frame = cv2.resize(frame, (new_w, new_h))
+
+        # Compute scale factors
+        scale_x = new_w / original_w
+        scale_y = new_h / original_h
+
+        for object_id, data in self.tracker.objects.items():
+            centroid = data["centroid"]
+            bbox = data["bbox"]
+            plate_number = data["plate_number"]
+            plate_confidence = data["confidence"]
+            direction = data["direction"]
+
+            # Scale coordinates
+            x1, y1, x2, y2 = [int(coord * scale) for coord, scale in zip(bbox, [scale_x, scale_y, scale_x, scale_y])]
+            cx, cy = int(centroid[0] * scale_x), int(centroid[1] * scale_y)
+
+            box_color = (0, 255, 0) if authorized == 1 else ((0, 0, 255) if authorized == -1 else (0, 0, 255))
+
+            # Draw on the resized frame
+            cv2.rectangle(resized_frame, (x1, y1), (x2, y2), box_color, 1)
+            cv2.circle(resized_frame, (cx, cy), 5, box_color, -1)
+            text = f"ID {object_id} - {direction}"
+            cv2.putText(resized_frame, text, (cx - 10, cy - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, box_color, 1)
+
+            if plate_number:
+                cv2.putText(resized_frame, f"Plate: {plate_number} - {plate_confidence:.2f}", (x1, y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+
+        return resized_frame
