@@ -1,1 +1,5 @@
+opencv-python-headless
+fastapi
+uvicorn
 redis
+requests
