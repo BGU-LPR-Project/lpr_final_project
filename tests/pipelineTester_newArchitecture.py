@@ -145,7 +145,7 @@ class pipelineTesterMicroservice:
         print("=========================================================")
         return precision, recall, f1
 
-    
+
     def run_test(self):
         self.push_frames()
         detected_raw = self.wait_for_results()
