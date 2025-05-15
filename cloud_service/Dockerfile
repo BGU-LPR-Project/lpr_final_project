@@ -13,15 +13,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ENV CCACHE_DISABLE=0
 ENV PATH="/usr/lib/ccache:${PATH}"
 
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Set working directory  
+WORKDIR /app  
 
-# Copy the rest of your application
-COPY . /app
+# Copy only necessary files first  
+COPY requirements.txt .  
 
-# Set the working directory
-WORKDIR /app
+# Install Python dependencies (optimized for caching)  
+RUN pip install --upgrade pip && \
+    pip install --default-timeout=100 --no-cache-dir -r requirements.txt
 
-# Run your app
-CMD ["python", "app.py"]
+# Copy the rest of the application files  
+COPY . .  
+
+# Expose the required port  
+EXPOSE 8000  
+
+# Use an explicit Python 3 command  
+CMD ["python3", "app.py"]

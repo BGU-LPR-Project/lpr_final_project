@@ -5,18 +5,18 @@ import threading
 import time
 import requests
 import pickle
+import uvicorn
+import logging
 from fastapi import FastAPI
 from edge import EdgeService
-import logging
 from queue import Queue
-import uvicorn
 
 VISUAL_FRAME_QUEUE = "visual_frame_queue"
 
 COOLDOWN = threading.Event()
 
 # Constants
-FRAME_QUEUE = Queue(maxsize=100)  # Limit to control memory usage
+FRAME_QUEUE = Queue(maxsize=30)  # Limit to control memory usage
 
 # FastAPI app initialization
 app = FastAPI()
@@ -34,20 +34,6 @@ def trigger_cooldown(edge_service):
             print("Cooldown ended.")
 
         threading.Thread(target=cooldown_logic, daemon=True).start()
-
-
-def wait_for_cloud_service():
-    """Wait for the cloud service to become healthy."""
-    while True:
-        try:
-            response = requests.get("http://cloud_service:8000/healthcheck", timeout=5)
-            if response.status_code == 200:
-                print("Cloud service is healthy.")
-                break
-        except requests.exceptions.RequestException:
-            print("Cloud service is not yet ready, retrying...")
-        time.sleep(1)
-
 
 def connect_to_redis():
     """Connect to the Redis server and wait for it to be ready."""
@@ -126,29 +112,11 @@ def frame_worker(edge_service):
         finally:
             FRAME_QUEUE.task_done()
 
-
-def start_polling():
-    wait_for_cloud_service()
-
-    redis_client = connect_to_redis()
-    edge_service = EdgeService("/app/models/yolo11n.pt", "/app/models/license_plate_detector.pt")
-    edge_service.on()
-
-    # Start the worker thread and polling thread
-    threading.Thread(target=frame_worker, args=(edge_service,), daemon=True).start()
-    threading.Thread(target=poll_queue, args=(redis_client, edge_service), daemon=True).start()
-
-    return {"status": "Polling started"}
-
-
 @app.get("/healthcheck")
 async def healthcheck():
     return "Edge service running!", 200
 
-
 def main():
-    wait_for_cloud_service()
-
     global redis_client
     redis_client = connect_to_redis()
     edge_service = EdgeService("/app/models/yolo11n.pt", "/app/models/license_plate_detector.pt")

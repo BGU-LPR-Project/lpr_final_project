@@ -1,10 +1,10 @@
 import base64
 import cv2
 import numpy as np
+import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from cloud import CloudService
-import threading
 
 # Initialize FastAPI app and CloudService
 app = FastAPI()
@@ -61,5 +61,4 @@ async def healthcheck():
     return {"status": "Cloud OCR service running!"}
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
