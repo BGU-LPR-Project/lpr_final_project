@@ -32,6 +32,11 @@ class RedisFrameViewer(QWidget):
 
         self.init_ui()
 
+    def closeEvent(self, event):
+        self.call_api("/stop-video")
+        print("UI closed — stop-video API called.")
+        event.accept()  # Accept the close event so the window will close
+
     def init_ui(self):
         self.setWindowTitle("License Plate Recognition - LPR UI")
         self.setWindowIcon(QIcon(os.path.join(ICON_DIR, "lpr_icon.png")))
