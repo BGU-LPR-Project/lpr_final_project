@@ -9,11 +9,12 @@ import uvicorn
 import logging
 from fastapi import FastAPI
 from edge import EdgeService
-from queue import Queue
+from queue import Queue, Empty
 
 VISUAL_FRAME_QUEUE = "visual_frame_queue"
 
 COOLDOWN = threading.Event()
+PAUSED = threading.Event()
 
 # Constants
 FRAME_QUEUE = Queue(maxsize=30)  # Limit to control memory usage
@@ -92,25 +93,65 @@ def poll_queue(redis_client, edge_service):
                 FRAME_QUEUE.put(frame, timeout=0.1)
             except:
                 print("Frame queue is full. Dropping frame.")
-        # edge_service.log_results()
-        # time.sleep(0.1)
 
 
 def frame_worker(edge_service):
     """Worker thread to consume frames and process them."""
     while True:
-        frame = FRAME_QUEUE.get()
-        if COOLDOWN.is_set():
-            print("Cooldown active. Dropping frame.")
-            FRAME_QUEUE.task_done()
-            continue
+        if not PAUSED.is_set():
+            frame = FRAME_QUEUE.get()
+            if COOLDOWN.is_set():
+                print("Cooldown active. Dropping frame.")
+                FRAME_QUEUE.task_done()
+                continue
 
+            try:
+                process_frame(frame, edge_service)
+            except Exception as e:
+                print(f"Error processing frame: {e}")
+            finally:
+                FRAME_QUEUE.task_done()
+        else:
+            time.sleep(1)
+
+def clear_thread_queue():
+    while not FRAME_QUEUE.empty():
         try:
-            process_frame(frame, edge_service)
-        except Exception as e:
-            print(f"Error processing frame: {e}")
-        finally:
+            FRAME_QUEUE.get_nowait()
+        except Empty:
+            break
+
+@app.get("/edge-pause")
+async def edge_pause():
+    PAUSED.set()
+    return "Edge paused!", 200
+
+@app.get("/edge-resume")
+async def edge_resume():
+    PAUSED.clear()
+    return "Edge resumed!", 200
+
+@app.get("/clear-queue")
+async def clear_queues():
+    redis_client.ltrim("frame_queue", 1, 0)
+    redis_client.ltrim("visual_frame_queue", 1, 0)
+    clear_thread_queue()
+
+@app.get("/skip-at-most-ten")
+async def skip():
+    max_frames_to_skip = 40
+    frames_skipped = 0
+
+    while frames_skipped < max_frames_to_skip and not FRAME_QUEUE.empty():
+        try:
+            FRAME_QUEUE.get_nowait()
             FRAME_QUEUE.task_done()
+            frames_skipped += 1
+        except Empty:
+            break
+
+    seconds_skipped = frames_skipped // 4
+    return {"seconds_skipped": seconds_skipped}
 
 @app.get("/healthcheck")
 async def healthcheck():

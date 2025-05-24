@@ -3,6 +3,7 @@ import redis
 import pickle
 import uvicorn
 import threading
+import requests
 from fastapi import FastAPI, BackgroundTasks
 from pydantic import BaseModel
 from video_handler import VideoHandler
@@ -75,6 +76,7 @@ def start_video(input: VideoInput):
         state["video_path"] = input.path
         state["pause_event"].clear()
         state["stop_event"].clear()
+        requests.get("http://edge_service:8000/edge-resume")
 
         t = threading.Thread(target=process_video, args=(input.path,))
         t.start()
@@ -85,17 +87,20 @@ def start_video(input: VideoInput):
 @app.post("/pause-video")
 def pause_video():
     state["pause_event"].set()
+    requests.get("http://edge_service:8000/edge-pause")
     return {"message": "Video processing paused."}
 
 @app.post("/resume-video")
 def resume_video():
     state["pause_event"].clear()
+    requests.get("http://edge_service:8000/edge-resume")
     return {"message": "Video processing resumed."}
 
 @app.post("/stop-video")
 def stop_video():
     state["stop_event"].set()
     state["pause_event"].clear()
+    requests.get("http://edge_service:8000/clear-queue")
     return {"message": "Video processing stopped."}
 
 @app.post("/restart-video")
@@ -109,9 +114,22 @@ def skip_10_seconds():
     handler = state.get("handler")
     if handler is None:
         return {"message": "No active video handler"}
-    
-    handler.seek(10)  # skip 10 seconds ahead from current position
-    return {"message": "Skipped forward 10 seconds"}
+
+    try:
+        # Call the internal API
+        response = requests.get("http://edge_service:8000/skip-at-most-ten", timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            seconds_skipped = data.get("seconds_skipped", 0)
+        else:
+            return {"message": "Failed to skip frames"}
+    except Exception as e:
+        return {"message": f"Error calling skip-at-most-ten: {e}"}
+
+    # Use the result to move the video handler
+    handler.seek(10 - seconds_skipped)
+    return {"message": "10 seconds skipped."}
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
