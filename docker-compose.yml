@@ -9,6 +9,7 @@ services:
       - "8000:8000" # Expose for frame retrieval
     depends_on:
       - redis
+      - edge_service
     networks:
       - app_network
 
@@ -21,6 +22,7 @@ services:
       - "8001:8000" # Expose for frame processing
     depends_on:
       - redis
+      - cloud_service
     networks:
       - app_network
     command: python -m memory_profiler app.py
@@ -41,8 +43,6 @@ services:
       - ./models:/app/models # Make sure this points to the correct local directory
     ports:
       - "8002:8000" # Expose for cloud interactions
-    depends_on:
-      - edge_service
     networks:
       - app_network
 

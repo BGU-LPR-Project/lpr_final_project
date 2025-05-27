@@ -1,4 +1,5 @@
 opencv-python-headless
-flask
+fastapi
+uvicorn
 redis
 requests

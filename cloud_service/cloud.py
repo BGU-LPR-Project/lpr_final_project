@@ -7,8 +7,15 @@ import os
 
 class CloudService:
     def __init__(self):
-        self.reader = paddleocr.PaddleOCR(use_angle_cls=True, lang='en')
         self.active = False
+        self.reader = paddleocr.PaddleOCR(
+            use_angle_cls=True,
+            lang='en',
+            det_model_dir='/app/models/paddle/det',
+            rec_model_dir='/app/models/paddle/rec',
+            cls_model_dir='/app/models/paddle/cls',
+            use_gpu=False
+        )
 
     def off(self):
         self.active = False
@@ -22,8 +29,9 @@ class CloudService:
             return
 
         text, conf = self.read_text_from_plate(plate_img)
-
+        print(text)
         processed_plate = process_plate(text) if text else None
+        print(processed_plate)
 
         if not processed_plate:
             CB((str(), 0.0))
