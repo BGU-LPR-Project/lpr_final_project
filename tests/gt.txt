@@ -1,0 +1,46 @@
+
+
+        09
+        {"plate": "43788503", "direction": "Exit", "authorized": 0},
+        {"plate": "80304001", "direction": "Entrance", "authorized": 0},
+        {"plate": "59476603", "direction": "Exit", "authorized": 0},
+        {"plate": "73778302", "direction": "Exit", "authorized": 0},
+        {"plate": "88731303", "direction": "Exit", "authorized": 0}
+
+
+        10
+        {"plate": "80304001", "direction": "Exit", "authorized": 0},
+        {"plate": "51797302", "direction": "Exit", "authorized": 0},
+        {"plate": "21972302", "direction": "Exit", "authorized": 0},
+        {"plate": "25103401", "direction": "Exit", "authorized": 0},
+        {"plate": "30644903", "direction": "Exit", "authorized": 0},
+        {"plate": "32258503", "direction": "Exit", "authorized": 0},
+        {"plate": "73888302", "direction": "Exit", "authorized": 0},
+        {"plate": "7752337", "direction": "Exit", "authorized": 0},
+        {"plate": "3853223", "direction": "Exit", "authorized": 0},
+        {"plate": "3853223", "direction": "Entrance", "authorized": 0},
+        {"plate": "68731303", "direction": "Entrance", "authorized": 0},
+        {"plate": "17240604", "direction": "Exit", "authorized": 0},
+        {"plate": "68288003", "direction": "Exit", "authorized": 0},
+        {"plate": "58099903", "direction": "Exit", "authorized": 0},
+        {"plate": "83050202", "direction": "Exit", "authorized": 0},
+        {"plate": "25103401", "direction": "Entrance", "authorized": 0},
+        {"plate": "25103401", "direction": "Exit", "authorized": 0},
+        {"plate": "68288003", "direction": "Entrance", "authorized": 0},
+        {"plate": "72528003", "direction": "Exit", "authorized": 0},
+        {"plate": "64514603", "direction": "Exit", "authorized": 0},
+        {"plate": "91240201", "direction": "Exit", "authorized": 0}
+
+
+
+        11
+
+        {"plate": "69073603", "direction": "Exit", "authorized": 0},
+        {"plate": "25180502", "direction": "Exit", "authorized": 0},
+        {"plate": "19093901", "direction": "Exit", "authorized": 0},
+        {"plate": "2879969", "direction": "Exit", "authorized": 0},
+        {"plate": "43788503", "direction": "Exit", "authorized": 0},
+        {"plate": "36943701", "direction": "Exit", "authorized": 0},
+        {"plate": "72528003", "direction": "Entrance", "authorized": 0},
+        {"plate": "63703201", "direction": "Exit", "authorized": 0},
+        {"plate": "73888302", "direction": "Entrance", "authorized": 0}

@@ -157,11 +157,13 @@ class pipelineTesterMicroservice:
 
 if __name__ == "__main__":
     ground_truth = [
-        {"plate": "MH01EB2570", "direction": "Exit", "authorized": 0},
-        {"plate": "MH02FX4729", "direction": "Entrance", "authorized": 0},
-        {"plate": "MH04HU1278", "direction": "Exit", "authorized": 0},
-        {"plate": "MH48AC4033", "direction": "Entrance", "authorized": 0},
+        {"plate": "43788503", "direction": "Exit", "authorized": 0},
+        {"plate": "80304001", "direction": "Entrance", "authorized": 0},
+        {"plate": "59476603", "direction": "Exit", "authorized": 0},
+        {"plate": "73778302", "direction": "Exit", "authorized": 0},
+        {"plate": "88731303", "direction": "Exit", "authorized": 0}
+
     ]
 
-    tester = pipelineTesterMicroservice("recordings/rec6.mp4", ground_truth)
+    tester = pipelineTesterMicroservice("recordings/fullMovie20250420_09.mp4", ground_truth)
     tester.run_test()
