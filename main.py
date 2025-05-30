@@ -152,7 +152,7 @@ class LPRPipeline:
 
 
 if __name__ == "__main__":
-    video_path = "recordings\\rec6.mp4"
+    video_path = "recordings\\motion4.mp4"
     pipeline = LPRPipeline(video_path)
     pipeline.run()
     pipeline.log_detection_results()
