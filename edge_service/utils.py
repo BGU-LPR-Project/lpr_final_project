@@ -49,23 +49,41 @@ def sharpenHBF(img: np.ndarray):
     return np.clip(a1, 0, 255).astype(np.uint8)
 
 def merge_boxes(boxes: List[BoundingBox]) -> List[BoundingBox]:
-        if not boxes:
-            return []
-        boxes.sort(key=lambda b: (b.y, b.x))
-        merged = [boxes[0]]
-        for current in boxes[1:]:
-            last = merged[-1]
-            if should_merge(last, current):
-                merged[-1] = last.merge_with(current)
-            else:
-                merged.append(current)
-        return merged
+    if not boxes:
+        return []
+
+    merged = boxes[:]
+    changed = True
+
+    while changed:
+        changed = False
+        new_merged = []
+        used = [False] * len(merged)
+
+        for i in range(len(merged)):
+            if used[i]:
+                continue
+            box1 = merged[i]
+            for j in range(i + 1, len(merged)):
+                if used[j]:
+                    continue
+                box2 = merged[j]
+                if should_merge(box1, box2):
+                    box1 = box1.merge_with(box2)
+                    used[j] = True
+                    changed = True
+            new_merged.append(box1)
+            used[i] = True
+
+        merged = new_merged
+
+    return merged
 
 def should_merge(box1: BoundingBox, box2: BoundingBox) -> bool:
         threshold = min(box1.width, box1.height, box2.width, box2.height) / 4
         close_in_x = abs((box1.x + box1.width / 2) - (box2.x + box2.width / 2)) < threshold
         close_in_y = abs((box1.y + box1.height / 2) - (box2.y + box2.height / 2)) < threshold
-        return box1.intersects_with(box2) or (close_in_x and close_in_y and intersect_over_union(box1, box2) < 0.7)
+        return box1.intersects_with(box2) or (close_in_x and close_in_y and intersect_over_union(box1, box2) < 0.7) or box1.is_inside(box2) or box2.is_inside(box1)
 
 def intersect_over_union(box1: BoundingBox, box2: BoundingBox) -> float:
         inter_x1 = max(box1.x, box2.x)
@@ -77,3 +95,26 @@ def intersect_over_union(box1: BoundingBox, box2: BoundingBox) -> float:
         box2_area = box2.width * box2.height
         union_area = box1_area + box2_area - inter_area
         return inter_area / union_area if union_area > 0 else 0
+
+def get_intersection_area(box1: BoundingBox, box2: BoundingBox) -> float:
+    inter_x1 = max(box1.x, box2.x)
+    inter_y1 = max(box1.y, box2.y)
+    inter_x2 = min(box1.x + box1.width, box2.x + box2.width)
+    inter_y2 = min(box1.y + box1.height, box2.y + box2.height)
+    return max(0, inter_x2 - inter_x1) * max(0, inter_y2 - inter_y1)
+
+def motion_box_valid_for_car(car_box: BoundingBox, motion_box: BoundingBox) -> bool:
+        # motion_area = motion_box.width * motion_box.height
+        # if motion_area < 1200:  # Lowered from 2000
+        #     return False
+
+        # Accept wider variety of aspect ratios (w/h)
+        aspect_ratio = motion_box.width / (motion_box.height + 1e-5)
+        if aspect_ratio < 0.7 or aspect_ratio > 4.0:  # Previously >1.2
+            return False
+
+        iou = intersect_over_union(car_box, motion_box)
+        if iou < 0.2:  # Loosen this too slightly
+            return False
+
+        return True
