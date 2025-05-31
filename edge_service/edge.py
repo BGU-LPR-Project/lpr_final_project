@@ -12,19 +12,6 @@ import redis
 import pickle
 
 
-# # Wait until Redis is ready
-# while True:
-#     try:
-#         self.redis_client.ping()
-#         break
-#     except redis.exceptions.BusyLoadingError:
-#         print("Redis is still loading... waiting 1s")
-#         time.sleep(1)
-
-# # Now safe to call commands like flushall
-# redis_client.flushall()
-
-
 class MotionDetector:
     def __init__(self):
         self.prev_frame = None
@@ -57,15 +44,19 @@ class MotionDetector:
         return merged_boxes
 
 class EdgeService:
-    def __init__(self, car_model_path, plate_model_path, confidence_threshold=0.2):
+    def __init__(self, car_model_path, plate_model_path, car_conf_threshold=0.5, plate_conf_threshold=0.2):
         self.motion_detector = MotionDetector()
         self.car_model = YOLO(car_model_path)
         self.plate_model = YOLO(plate_model_path)
         self.tracker = CentroidTracker()
         self.region_adjuster = RegionAdjuster(800, 600)
-        self.confidence_threshold = confidence_threshold
+        
+        self.car_conf_threshold = car_conf_threshold
+        self.plate_conf_threshold = plate_conf_threshold
+
         self.active = False
         self.lock = threading.RLock()
+
 
     def off(self):
         self.active = False
@@ -104,11 +95,15 @@ class EdgeService:
             confidence = box.conf[0].item()
             class_id = int(box.cls[0].item())
             x1, y1, x2, y2 = map(int, box.xyxy[0])
+            # cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 0), 2)
 
             detected_car_box = BoundingBox(x1, y1, x2 - x1, y2 - y1, confidence)
-            if confidence > self.confidence_threshold and class_id in [2, 3, 5, 7]:
+            if confidence > self.car_conf_threshold and class_id in [2, 3, 5, 7]:
                 for motion_box in motion_boxes:
-                    if utils.intersect_over_union(detected_car_box, motion_box) >= 0.5:
+                    if (
+                        detected_car_box.intersects_with(motion_box) and
+                        utils.motion_box_valid_for_car(detected_car_box, motion_box)
+                    ):
                         detections.append((x1, y1, x2, y2))
                         break
 
@@ -116,7 +111,7 @@ class EdgeService:
         tracked_cars = self.tracker.update(filtered_detections)
 
         return tracked_cars
-
+    
     def detect_license_plate_boxes(self, frame, detected_cars):
 
         if len(detected_cars.items()) == 0:
@@ -124,70 +119,84 @@ class EdgeService:
 
         plates_results = self.plate_model(frame)[0].boxes
 
+        assigned_car_ids = []
         car_plates = {}
         for plate in plates_results:
             confidence = plate.conf[0].item()
             class_id = int(plate.cls[0].item())
             x1, y1, x2, y2 = map(int, plate.xyxy[0])
-
-            if confidence > self.confidence_threshold and int(class_id) == 0:
+                        
+            if confidence > self.plate_conf_threshold and int(class_id) == 0:
+                # cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
                 plate_box = BoundingBox(int(x1), int(y1), int(x2 - x1), int(y2 - y1), confidence)
-                best_match_car_id = self.match_plate_to_car(plate_box, detected_cars)
+                best_match_car_id = self.match_plate_to_car(plate_box, detected_cars, assigned_car_ids)
+                if best_match_car_id is not None:
+                    assigned_car_ids.append(best_match_car_id)
 
                 if best_match_car_id is not None and not self.tracker.objects[best_match_car_id]["done"]:
                     car_plates[best_match_car_id] = (int(x1), int(y1), int(x2), int(y2))
 
         return car_plates
-
-    def match_plate_to_car(self, plate_box, detected_cars):
+    
+    def match_plate_to_car(self, plate_box, detected_cars, assigned_car_ids):
         best_match_car_id = None
         smallest_distance = float('inf')
 
+        plate_center_x = plate_box.x + plate_box.width / 2
+        plate_center_y = plate_box.y + plate_box.height / 2
+
         for car_id, car_details in detected_cars.items():
-            car_center = car_details["centroid"]
+            if car_id in assigned_car_ids:
+                continue  # Skip already assigned cars
+
+            car_center_x, car_center_y = car_details["centroid"]
             car_box = car_details['bbox']
 
-            plate_center_x = plate_box.x + plate_box.width / 2
-            plate_center_y = plate_box.y + plate_box.height / 2
+            # Use the alignment logic
+            if self.is_spatially_aligned(car_box, plate_box):
+                distance = ((car_center_x - plate_center_x) ** 2 + (car_center_y - plate_center_y) ** 2) ** 0.5
 
-            distance = ((car_center[0] - plate_center_x) ** 2 + (car_center[1] - plate_center_y) ** 2) ** 0.5
-
-            if self.is_spatially_aligned(car_box, plate_box) and distance < smallest_distance:
-                smallest_distance = distance
-                best_match_car_id = car_id
+                if distance < smallest_distance:
+                    smallest_distance = distance
+                    best_match_car_id = car_id
 
         return best_match_car_id
-
+    
     def is_spatially_aligned(self, car_box, plate_box):
-        car_height = car_box[3] - car_box[1]
-        car_bottom_y = car_box[3]
-        plate_bottom_y = plate_box.y + plate_box.height
+        car_x1, car_y1, car_x2, car_y2 = car_box
+        plate_x1, plate_y1 = plate_box.x, plate_box.y
+        plate_x2, plate_y2 = plate_box.x + plate_box.width, plate_box.y + plate_box.height
 
-        vertically_aligned = car_bottom_y - plate_bottom_y < car_height / 3
+        # Allow plate to be anywhere vertically within car height
+        vertically_aligned = plate_y1 >= car_y1 and plate_y2 <= car_y2
+
+        # Allow plates closer to edges, add tolerance of few pixels outside the car box horizontally
+        horizontal_tolerance = 0  # adjust this if needed
         horizontally_aligned = (
-            plate_box.x > car_box[0] and
-            plate_box.x + plate_box.width < car_box[2]
+                plate_x2 >= car_x1 - horizontal_tolerance and
+                plate_x1 <= car_x2 + horizontal_tolerance
         )
 
         return vertically_aligned and horizontally_aligned
 
     def update_tracked_vehicle(self, vehicle_id, ocr_text, ocr_confidence):
-        vehicle_details = self.tracker.objects[vehicle_id]
-        prev_plate_number = vehicle_details["plate_number"]
-        prev_confidence = vehicle_details["confidence"]
-        occurs = vehicle_details["occurs"]
+        vehicle = self.tracker.objects[vehicle_id]
+        prev_text = vehicle["plate_number"]
+        prev_conf = vehicle["confidence"]
+        occurs = vehicle["occurs"]
 
-        if ocr_text and (ocr_confidence >= prev_confidence):
-            vehicle_details['plate_number'] = ocr_text
-            vehicle_details["confidence"] = ocr_confidence
-            vehicle_details["last_timestamp"] = datetime.now()
-            if prev_plate_number == ocr_text:
-                vehicle_details["occurs"] = occurs + 1
-            else:
-                vehicle_details["occurs"] = 0
-            vehicle_details["done"] =  vehicle_details["occurs"] >= 2
+        if ocr_text and ocr_confidence >= prev_conf:
+            is_same_text = (ocr_text == prev_text)
+
+            vehicle.update({
+                "plate_number": ocr_text,
+                "confidence": ocr_confidence,
+                "last_timestamp": datetime.now(),
+                "occurs": occurs + 1 if is_same_text else 0,
+            })
+            vehicle["done"] = vehicle["occurs"] >= 2
             self.tracker.update_tracked_plate(vehicle_id, ocr_text)
-
+    
     def log_results(self):
         redis_client = redis.StrictRedis(host='redis', port=6379, db=0)
         redis_client.set("tracked_plates", pickle.dumps([(oid, v["plate_number"], v["confidence"]) for oid, v in self.tracker.objects.items()]))

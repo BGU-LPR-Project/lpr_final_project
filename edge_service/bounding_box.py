@@ -20,3 +20,11 @@ class BoundingBox:
         new_w = max(self.x + self.width, other.x + other.width) - new_x
         new_h = max(self.y + self.height, other.y + other.height) - new_y
         return BoundingBox(new_x, new_y, new_w, new_h, max(self.confidence, other.confidence))
+
+    def is_inside(self, other: 'BoundingBox') -> bool:
+        return (
+            self.x >= other.x and
+            self.y >= other.y and
+            self.x + self.width <= other.x + other.width and
+            self.y + self.height <= other.y + other.height
+        )
