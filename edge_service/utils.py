@@ -1,120 +1,167 @@
-import cv2
-import numpy as np
 from bounding_box import BoundingBox
 from typing import List
 
-def align_images(ref_image, img_to_align):
-    orb = cv2.ORB_create(500)
-    kp1, des1 = orb.detectAndCompute(ref_image, None)
-    kp2, des2 = orb.detectAndCompute(img_to_align, None)
-    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-    matches = bf.match(des1, des2)
-    matches = sorted(matches, key=lambda x: x.distance)
-    num_good_matches = max(10, int(len(matches) * 0.1))
-    good_matches = matches[:num_good_matches]
-    if len(good_matches) < 3:
-        return img_to_align
-    pts1 = np.float32([kp1[m.queryIdx].pt for m in good_matches])
-    pts2 = np.float32([kp2[m.trainIdx].pt for m in good_matches])
-    translation = np.mean(pts1 - pts2, axis=0)
-    M = np.float32([[1, 0, translation[0]], [0, 1, translation[1]]])
-    aligned_img = cv2.warpAffine(img_to_align, M, (ref_image.shape[1], ref_image.shape[0]))
-    return aligned_img
-
-def resize_plate(plate: np.ndarray):
-    new_width, new_height = 300, 75
-    height, width, _ = plate.shape
-    scale = min(new_width / width, new_height / height)
-    resized_width, resized_height = int(width * scale), int(height * scale)
-    resized_image = cv2.resize(plate, (resized_width, resized_height), interpolation=cv2.INTER_LANCZOS4)
-    final_image = np.zeros((new_height, new_width, 3), dtype=np.uint8)
-    x_offset, y_offset = (new_width - resized_width) // 2, (new_height - resized_height) // 2
-    final_image[y_offset:y_offset+resized_height, x_offset:x_offset+resized_width] = resized_image
-    return final_image
-
-def sharpenLAP(img: np.ndarray):
-    Lap = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]], dtype=np.float32)
-    a1 = cv2.filter2D(img, -1, Lap)
-    a2 = np.clip(a1, 0, 255).astype(np.uint8)
-    sharpened1 = cv2.absdiff(img, a2)
-    strong_Lap = np.array([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]], dtype=np.float32)
-    a3 = cv2.filter2D(img, -1, strong_Lap)
-    a4 = np.clip(a3, 0, 255).astype(np.uint8)
-    sharpened2 = cv2.add(img, a4)
-    return sharpened2
-
-def sharpenHBF(img: np.ndarray):
-    HBF = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]], dtype=np.float32)
-    a1 = cv2.filter2D(img, -1, HBF)
-    return np.clip(a1, 0, 255).astype(np.uint8)
-
 def merge_boxes(boxes: List[BoundingBox]) -> List[BoundingBox]:
+    """
+    Merge overlapping or close bounding boxes into combined boxes.
+
+    Args:
+        boxes (List[BoundingBox]): List of bounding boxes to merge.
+
+    Returns:
+        List[BoundingBox]: List of merged bounding boxes.
+    """
     if not boxes:
         return []
 
+    # Start with a shallow copy of the input boxes
     merged = boxes[:]
     changed = True
 
+    # Repeat merging process until no more merges occur
     while changed:
         changed = False
         new_merged = []
-        used = [False] * len(merged)
+        used = [False] * len(merged)  # Track which boxes have been merged/used
 
+        # Iterate through all boxes
         for i in range(len(merged)):
             if used[i]:
-                continue
+                continue  # Skip if this box was already merged
+
             box1 = merged[i]
+
+            # Try to merge box1 with any subsequent boxes not yet merged
             for j in range(i + 1, len(merged)):
                 if used[j]:
                     continue
                 box2 = merged[j]
+
+                # If boxes qualify to merge, merge box2 into box1 and mark box2 used
                 if should_merge(box1, box2):
                     box1 = box1.merge_with(box2)
                     used[j] = True
-                    changed = True
-            new_merged.append(box1)
+                    changed = True  # Mark that a merge happened this round
+
+            new_merged.append(box1)  # Add the merged (or original) box
             used[i] = True
 
-        merged = new_merged
+        merged = new_merged  # Update the list with merged boxes
 
     return merged
 
 def should_merge(box1: BoundingBox, box2: BoundingBox) -> bool:
-        threshold = min(box1.width, box1.height, box2.width, box2.height) / 4
-        close_in_x = abs((box1.x + box1.width / 2) - (box2.x + box2.width / 2)) < threshold
-        close_in_y = abs((box1.y + box1.height / 2) - (box2.y + box2.height / 2)) < threshold
-        return box1.intersects_with(box2) or (close_in_x and close_in_y and intersect_over_union(box1, box2) < 0.7) or box1.is_inside(box2) or box2.is_inside(box1)
+    """
+    Determine whether two bounding boxes should be merged based on
+    spatial proximity, intersection, and IoU (Intersection over Union).
+
+    Args:
+        box1 (BoundingBox): First bounding box.
+        box2 (BoundingBox): Second bounding box.
+
+    Returns:
+        bool: True if boxes should be merged, False otherwise.
+    """
+    # Calculate a threshold based on a quarter of the smallest box dimension
+    threshold = min(box1.width, box1.height, box2.width, box2.height) / 4
+
+    # Check if centers of boxes are close in horizontal and vertical directions
+    close_in_x = abs((box1.x + box1.width / 2) - (box2.x + box2.width / 2)) < threshold
+    close_in_y = abs((box1.y + box1.height / 2) - (box2.y + box2.height / 2)) < threshold
+
+    # Decide to merge if:
+    # - Boxes intersect, OR
+    # - Boxes are close and have IoU less than 0.7 (to avoid heavy overlap),
+    # OR - One box is fully inside the other
+    return (box1.intersects_with(box2) or
+            (close_in_x and close_in_y and intersect_over_union(box1, box2) < 0.7) or
+            box1.is_inside(box2) or
+            box2.is_inside(box1))
 
 def intersect_over_union(box1: BoundingBox, box2: BoundingBox) -> float:
-        inter_x1 = max(box1.x, box2.x)
-        inter_y1 = max(box1.y, box2.y)
-        inter_x2 = min(box1.x + box1.width, box2.x + box2.width)
-        inter_y2 = min(box1.y + box1.height, box2.y + box2.height)
-        inter_area = max(0, inter_x2 - inter_x1) * max(0, inter_y2 - inter_y1)
-        box1_area = box1.width * box1.height
-        box2_area = box2.width * box2.height
-        union_area = box1_area + box2_area - inter_area
-        return inter_area / union_area if union_area > 0 else 0
+    """
+    Calculate Intersection over Union (IoU) of two bounding boxes.
 
-def get_intersection_area(box1: BoundingBox, box2: BoundingBox) -> float:
+    IoU is the ratio of the area of the intersection to the area of the union
+    of the two boxes.
+
+    Args:
+        box1 (BoundingBox): First bounding box.
+        box2 (BoundingBox): Second bounding box.
+
+    Returns:
+        float: IoU value between 0 (no overlap) and 1 (perfect overlap).
+    """
+    # Calculate intersection rectangle coordinates
     inter_x1 = max(box1.x, box2.x)
     inter_y1 = max(box1.y, box2.y)
     inter_x2 = min(box1.x + box1.width, box2.x + box2.width)
     inter_y2 = min(box1.y + box1.height, box2.y + box2.height)
+
+    # Calculate intersection area (0 if no overlap)
+    inter_area = max(0, inter_x2 - inter_x1) * max(0, inter_y2 - inter_y1)
+
+    # Calculate individual box areas
+    box1_area = box1.width * box1.height
+    box2_area = box2.width * box2.height
+
+    # Calculate union area
+    union_area = box1_area + box2_area - inter_area
+
+    # Return IoU ratio, handle zero division case
+    return inter_area / union_area if union_area > 0 else 0
+
+def get_intersection_area(box1: BoundingBox, box2: BoundingBox) -> float:
+    """
+    Calculate the intersection area of two bounding boxes.
+
+    Args:
+        box1 (BoundingBox): First bounding box.
+        box2 (BoundingBox): Second bounding box.
+
+    Returns:
+        float: Area of the intersection region, or 0 if no intersection.
+    """
+    # Calculate intersection rectangle coordinates
+    inter_x1 = max(box1.x, box2.x)
+    inter_y1 = max(box1.y, box2.y)
+    inter_x2 = min(box1.x + box1.width, box2.x + box2.width)
+    inter_y2 = min(box1.y + box1.height, box2.y + box2.height)
+
+    # Compute intersection area (width * height)
     return max(0, inter_x2 - inter_x1) * max(0, inter_y2 - inter_y1)
 
 def motion_box_valid_for_car(car_box: BoundingBox, motion_box: BoundingBox) -> bool:
-        # motion_area = motion_box.width * motion_box.height
-        # if motion_area < 1200:  # Lowered from 2000
-        #     return False
+    """
+    Validate if a motion detection box is a plausible match for a car bounding box.
 
-        # Accept wider variety of aspect ratios (w/h)
-        aspect_ratio = motion_box.width / (motion_box.height + 1e-5)
-        if aspect_ratio < 0.7 or aspect_ratio > 4.0:  # Previously >1.2
-            return False
+    Criteria:
+    - The motion box aspect ratio (width/height) is within a reasonable range.
+    - The IoU with the car box is above a minimum threshold (0.2).
 
-        iou = intersect_over_union(car_box, motion_box)
-        if iou < 0.2:  # Loosen this too slightly
-            return False
+    Args:
+        car_box (BoundingBox): Bounding box of the car.
+        motion_box (BoundingBox): Bounding box from motion detection.
 
-        return True
+    Returns:
+        bool: True if the motion box is valid for the car box, False otherwise.
+    """
+    # motion_area = motion_box.width * motion_box.height
+    # if motion_area < 1200:  # Lowered from 2000
+    #     return False
+
+    # Calculate aspect ratio of the motion box (avoid division by zero)
+    aspect_ratio = motion_box.width / (motion_box.height + 1e-5)
+
+    # Reject if aspect ratio is too narrow or too wide
+    if aspect_ratio < 0.7 or aspect_ratio > 4.0:
+        return False
+
+    # Calculate IoU between car and motion boxes
+    iou = intersect_over_union(car_box, motion_box)
+
+    # Reject if IoU is too low (insufficient overlap)
+    if iou < 0.2:
+        return False
+
+    return True

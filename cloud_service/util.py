@@ -107,6 +107,10 @@ def fuse_thresholded_images(thresholded_images):
 
 
 def sharpenLAP(img: np.ndarray):
+    """
+    Apply two Laplacian-based sharpening filters to enhance edges in the input image.
+    Returns the image sharpened using the stronger Laplacian kernel.
+    """
     # Define the Laplacian filters
     Lap = np.array([[0, 1, 0],
                     [1, -4, 1],
@@ -134,6 +138,10 @@ def sharpenLAP(img: np.ndarray):
 
 
 def sharpenHBF(img: np.ndarray):
+    """
+    Apply High Boost Filters (HBF) to enhance details and sharpen the input image.
+    Returns the image sharpened with standard and strong HBF kernels.
+    """
     # Define the High Boost Filters (HBF)
     HBF = np.array([[0, -1, 0],
                     [-1, 5, -1],
@@ -154,6 +162,10 @@ def sharpenHBF(img: np.ndarray):
 
 
 def multi_threshold_plate(plate):
+    """
+    Enhance and binarize a license plate image using multiple thresholding techniques.
+    Applies CLAHE, Otsu, adaptive, Niblack, and Sauvola methods, then merges results.
+    """
     # Convert to grayscale if necessary
     if len(plate.shape) == 3:
         plate = cv2.cvtColor(plate, cv2.COLOR_BGR2GRAY)
@@ -193,6 +205,10 @@ def multi_threshold_plate(plate):
 
 
 def weighted_majority_vote(ocr_results, entering=True):
+    """
+    Perform weighted majority voting on a sequence of OCR results to produce
+    a stable license plate prediction. Applies exponential decay based on position.
+    """
     N = len(ocr_results)
     if N == 0:
         return "UNKNOWN"

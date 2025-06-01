@@ -22,7 +22,7 @@ class RedisFrameViewer(QWidget):
 
         self.redis = redis.Redis(host='localhost', port=6379, db=0)
         self.queue_name = "visual_frame_queue"
-        self.video_path = "/app/recordings/fullMovie20250420_09.mp4"
+        self.video_path = "/app/recordings/bug-video1.mp4"
 
         # Main video display label
         self.video_label = QLabel(self)
