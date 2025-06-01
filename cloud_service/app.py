@@ -6,49 +6,63 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from cloud import CloudService
 
-# Initialize FastAPI app and CloudService
+# Initialize FastAPI app and cloud-based OCR service
 app = FastAPI()
 cloud_service = CloudService()
 cloud_service.on()
 
-# Model to structure the input for the /predict endpoint
+# Input data model for /predict endpoint
 class PlateImage(BaseModel):
-    plate_img: str
+    plate_img: str  # Base64-encoded image of the license plate
 
-# Model to structure the OCR result
+# Output data model for OCR results
 class OCRResult(BaseModel):
-    ocr_result: tuple
+    ocr_result: tuple  # Tuple containing (recognized_text, confidence)
 
 def predict_plate_img(plate_img: np.ndarray):
-    """Process the plate image and get prediction asynchronously."""
+    """
+    Run OCR prediction on the plate image using the CloudService.
+
+    Args:
+        plate_img (np.ndarray): Decoded license plate image.
+
+    Returns:
+        dict: OCR result with 'ocr_result' as (text, confidence).
+    """
     result = {"ocr_result": (str(), 0.0)}
 
     def callback(prediction):
-        """Callback to handle the prediction result."""
+        """Capture prediction result via callback."""
         nonlocal result
         result["ocr_result"] = prediction
 
-    # Process prediction asynchronously
+    # Perform asynchronous prediction
     cloud_service.predict(plate_img, callback)
-    
     return result
 
 @app.post("/predict", response_model=OCRResult)
 async def predict(plate_image: PlateImage):
-    """Handle prediction requests for license plate number."""
+    """
+    Predict license plate number from base64-encoded image.
+
+    Args:
+        plate_image (PlateImage): Request body with base64 plate image.
+
+    Returns:
+        OCRResult: Recognized text and confidence.
+    """
     try:
         plate_img_encoded = plate_image.plate_img
 
         if not plate_img_encoded:
             raise HTTPException(status_code=400, detail="No plate image provided")
 
-        # Decode the base64 image
+        # Decode base64 string to image
         img_bytes = base64.b64decode(plate_img_encoded)
         plate_img = cv2.imdecode(np.frombuffer(img_bytes, np.uint8), cv2.IMREAD_COLOR)
 
-        # Perform prediction
+        # Perform OCR prediction
         result = predict_plate_img(plate_img)
-
         return result
 
     except Exception as e:
@@ -57,8 +71,14 @@ async def predict(plate_image: PlateImage):
 
 @app.get("/healthcheck")
 async def healthcheck():
-    """Health check endpoint to ensure the service is running."""
+    """
+    Endpoint to verify service health.
+
+    Returns:
+        dict: Health status of the OCR service.
+    """
     return {"status": "Cloud OCR service running!"}
 
 if __name__ == "__main__":
+    # Run the FastAPI app with Uvicorn server
     uvicorn.run(app, host="0.0.0.0", port=8000)
