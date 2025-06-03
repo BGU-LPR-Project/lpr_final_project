@@ -134,7 +134,6 @@ class pipelineTesterMicroservice:
                         best_match = gt["plate"]
                         best_gt = gt
 
-                # Log all partial matches for analysis
                 if best_ratio >= 0.6:  # Lower threshold for logging
                     partial_matches.append((plate, best_match, best_ratio))
                     if best_gt:

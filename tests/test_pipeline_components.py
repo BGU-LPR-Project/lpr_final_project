@@ -8,20 +8,19 @@ import unittest
 import numpy as np
 import cv2
 from unittest.mock import Mock, patch, MagicMock
-from edge_service.edge import EdgeService
+from edge import EdgeService
 from cloud_service.formats import process_plate
-from edge_service.bounding_box import BoundingBox
+from bounding_box import BoundingBox
 
 class TestPipelineComponents(unittest.TestCase):
     @patch('edge_service.edge.YOLO')
     def setUp(self, mock_yolo):
-        """Set up test fixtures before each test method."""
         # Create a mock frame for testing
         self.test_frame = np.zeros((480, 640, 3), dtype=np.uint8)
         # Add a mock license plate region
         cv2.rectangle(self.test_frame, (100, 100), (200, 150), (255, 255, 255), -1)
 
-        # Mock YOLO model
+        # Mock YOLO
         mock_yolo_instance = Mock()
         mock_yolo_instance.return_value = Mock()
         mock_yolo_instance.return_value.boxes = Mock()
@@ -50,7 +49,6 @@ class TestPipelineComponents(unittest.TestCase):
         self.ocr_service.process_image.return_value = ("43788503", 0.95)  # Return tuple of (text, confidence)
 
     def test_motion_detection(self):
-        """Test motion detection functionality."""
         # Create two frames with motion
         frame1 = np.zeros((480, 640, 3), dtype=np.uint8)
         frame2 = frame1.copy()
@@ -69,7 +67,6 @@ class TestPipelineComponents(unittest.TestCase):
         self.assertEqual(len(motion_boxes), 0)
 
     def test_car_detection(self):
-        """Test car detection functionality."""
         # Create a frame with a car
         frame = np.zeros((480, 640, 3), dtype=np.uint8)
         cv2.rectangle(frame, (100, 100), (300, 200), (255, 255, 255), -1)  # Mock car
@@ -107,7 +104,6 @@ class TestPipelineComponents(unittest.TestCase):
         self.assertGreater(len(cars), 0)
 
     def test_plate_detection(self):
-        """Test license plate detection functionality."""
         # Create a frame with a license plate
         frame = np.zeros((480, 640, 3), dtype=np.uint8)
         cv2.rectangle(frame, (100, 100), (200, 150), (255, 255, 255), -1)  # Mock plate
@@ -157,7 +153,6 @@ class TestPipelineComponents(unittest.TestCase):
         self.assertEqual(len(plates[1]), 4)  # x, y, w, h
 
     def test_plate_processing(self):
-        """Test plate number processing and formatting."""
         # Test valid plate numbers
         self.assertEqual(process_plate("43788503"), "43788503")
         self.assertEqual(process_plate("43788503 "), "43788503")  # Remove spaces
@@ -172,7 +167,6 @@ class TestPipelineComponents(unittest.TestCase):
             process_plate(None)
 
     def test_tracking_consistency(self):
-        """Test vehicle tracking consistency."""
         # Test tracking update
         self.edge_service.update_tracked_vehicle(1, "43788503", 0.95)
         self.assertEqual(self.edge_service.tracker.objects[1]["plate_number"], "43788503")
@@ -195,7 +189,6 @@ class TestPipelineComponents(unittest.TestCase):
         self.assertEqual(self.edge_service.tracker.objects[3]["occurs"], 0)
 
     def test_error_handling(self):
-        """Test error handling in pipeline components."""
         # Test invalid frame
         with self.assertRaises(ValueError):
             self.edge_service.motion_detector.detect_motion = Mock(side_effect=ValueError("Invalid frame"))

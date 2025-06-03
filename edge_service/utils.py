@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from edge_service.bounding_box import BoundingBox
+from bounding_box import BoundingBox
 from typing import List
 
 def align_images(ref_image, img_to_align):
