@@ -2,12 +2,12 @@ from datetime import datetime
 import cv2
 import numpy as np
 from ultralytics import YOLO
-from tracking import CentroidTracker
-from roi import RegionAdjuster
+from edge_service.tracking import CentroidTracker
+from edge_service.roi import RegionAdjuster
 from typing import List
 import threading
-import utils
-from bounding_box import BoundingBox
+from edge_service import utils
+from edge_service.bounding_box import BoundingBox
 import redis
 import pickle
 

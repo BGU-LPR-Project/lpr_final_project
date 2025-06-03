@@ -25,7 +25,6 @@ services:
       - cloud_service
     networks:
       - app_network
-    command: python -m memory_profiler app.py
 
   redis:
     image: "redis:alpine"
@@ -33,8 +32,11 @@ services:
     networks:
       - app_network
     ports:
-      - "6379:6379" # optional: expose port 6379 to host machine
-    restart: always # optional: restart policy in case the container stops
+      - "6379:6379"
+    restart: always
+    command: redis-server --maxmemory 6gb --maxmemory-policy allkeys-lru --save 900 1 --save 300 10 --save 60 10000
+    volumes:
+      - redis_data:/data
 
   cloud_service:
     build: ./cloud_service
@@ -45,6 +47,9 @@ services:
       - "8002:8000" # Expose for cloud interactions
     networks:
       - app_network
+
+volumes:
+  redis_data:
 
 networks:
   app_network:

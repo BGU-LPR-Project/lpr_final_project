@@ -16,13 +16,20 @@ from cloud_service.formats import process_plate
 
 
 class pipelineTesterMicroservice:
-    def __init__(self, video_path: str, ground_truth: List[Dict], partial_match_threshold: float = 0.9):
+    def __init__(self, video_path: str, ground_truth: List[Dict],
+                 partial_match_threshold: float = 0.75,
+                 check_direction: bool = True,
+                 check_authorization: bool = True):
         self.video_path = video_path
         self.ground_truth = [
-            {"plate": process_plate(gt["plate"].upper()), "direction": gt.get("direction"), "authorized": gt.get("authorized")}
+            {"plate": process_plate(gt["plate"].upper()),
+             "direction": gt.get("direction"),
+             "authorized": gt.get("authorized")}
             for gt in ground_truth if gt.get("plate")
         ]
         self.partial_match_threshold = partial_match_threshold
+        self.check_direction = check_direction
+        self.check_authorization = check_authorization
         self.redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
         self.redis_client.flushall()
 
@@ -66,7 +73,7 @@ class pipelineTesterMicroservice:
         return results
 
     def evaluate(self, detected: List[Dict]) -> Tuple[float, float, float]:
-        from collections import Counter
+        from collections import Counter, defaultdict
         import difflib
 
         gt_plates = [d["plate"] for d in self.ground_truth]
@@ -85,27 +92,62 @@ class pipelineTesterMicroservice:
         exact_matches = []
         partial_matches = []
         unmatched = []
+        correct_dirs = 0
+        correct_auth = 0
+        direction_comparisons = []
+        auth_comparisons = []
 
-        for pred in pred_plates:
-            if gt_counts[pred] > 0:
-                exact_matches.append(pred)
-                gt_counts[pred] -= 1
+        for pred in detected:
+            plate = pred["plate"]
+            actual_dir = pred.get("direction")
+            actual_auth = pred.get("authorized")
+            matched = False
+
+            if gt_counts[plate] > 0:
+                exact_matches.append(plate)
+                gt_counts[plate] -= 1
                 tp += 1
+                matched = True
+
+                # Check direction and authorization for exact matches
+                expected_dir = next((gt["direction"] for gt in self.ground_truth if gt["plate"] == plate), None)
+                expected_auth = next((gt["authorized"] for gt in self.ground_truth if gt["plate"] == plate), None)
+
+                direction_comparisons.append((plate, expected_dir, actual_dir))
+                auth_comparisons.append((plate, expected_auth, actual_auth))
+
+                if self.check_direction and expected_dir == actual_dir:
+                    correct_dirs += 1
+
+                if self.check_authorization and expected_auth is not None and expected_auth == actual_auth:
+                    correct_auth += 1
+
             else:
                 # Try partial match
                 best_match = None
                 best_ratio = 0.0
-                for gt in gt_plates:
-                    ratio = difflib.SequenceMatcher(None, pred or "", gt or "").ratio()
+                best_gt = None
+                for gt in self.ground_truth:
+                    ratio = difflib.SequenceMatcher(None, plate or "", gt["plate"] or "").ratio()
                     if ratio > best_ratio:
                         best_ratio = ratio
-                        best_match = gt
+                        best_match = gt["plate"]
+                        best_gt = gt
+
+                # Log all partial matches for analysis
+                if best_ratio >= 0.6:  # Lower threshold for logging
+                    partial_matches.append((plate, best_match, best_ratio))
+                    if best_gt:
+                        direction_comparisons.append((plate, best_gt.get("direction"), actual_dir,
+                                                   f"Partial match: {best_match} ({best_ratio:.2f})"))
+                        auth_comparisons.append((plate, best_gt.get("authorized"), actual_auth,
+                                              f"Partial match: {best_match} ({best_ratio:.2f})"))
+
                 if best_ratio >= self.partial_match_threshold and gt_counts[best_match] > 0:
-                    partial_matches.append((pred, best_match, best_ratio))
                     gt_counts[best_match] -= 1
                     tp += 1
                 else:
-                    unmatched.append(pred)
+                    unmatched.append(plate)
                     fp += 1
 
         # Count remaining unmatched GT
@@ -122,7 +164,8 @@ class pipelineTesterMicroservice:
         if partial_matches:
             print("\n==================== PARTIAL MATCHES ===================")
             for pred, gt, score in partial_matches:
-                print(f"Detected: {pred} | GT: {gt} | Similarity: {score:.2f}")
+                match_type = "ACCEPTED" if score >= self.partial_match_threshold else "REJECTED"
+                print(f"Detected: {pred} | GT: {gt} | Similarity: {score:.2f} | {match_type}")
 
         if unmatched:
             print("\n==================== UNMATCHED DETECTIONS ==============")
@@ -134,6 +177,20 @@ class pipelineTesterMicroservice:
             for plate, count in gt_counts.items():
                 if count > 0:
                     print(f"{plate} (missed {count}x)")
+
+        # if self.check_direction:
+        #     print("\n==================== DIRECTION DETECTION ===================")
+        #     print(f"Direction Accuracy: {correct_dirs}/{tp} = {correct_dirs/tp if tp > 0 else 0:.2f}")
+        #     print("\nDirection Comparison per Plate:")
+        #     for plate, expected, actual, note in direction_comparisons:
+        #         print(f"Plate: {plate} | Expected: {expected} | Detected: {actual} | {note}")
+
+        # if self.check_authorization:
+        #     print("\n==================== AUTHORIZATION DETECTION ===================")
+        #     print(f"Authorization Accuracy: {correct_auth}/{tp} = {correct_auth/tp if tp > 0 else 0:.2f}")
+        #     print("\nAuthorization Comparison per Plate:")
+        #     for plate, expected, actual, note in auth_comparisons:
+        #         print(f"Plate: {plate} | Expected: {expected} | Detected: {actual} | {note}")
 
         print("\n====================== METRICS ==========================")
         print(f"TP: {tp}")
