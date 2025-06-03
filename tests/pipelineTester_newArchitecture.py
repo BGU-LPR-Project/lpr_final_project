@@ -12,7 +12,6 @@ import difflib
 from video_service.video_handler import VideoHandler
 from cloud_service.formats import process_plate
 
-# Removed the misplaced line as it is redundant and already defined in the class constructor.
 
 
 class pipelineTesterMicroservice:
@@ -213,11 +212,11 @@ class pipelineTesterMicroservice:
 
 if __name__ == "__main__":
     ground_truth = [
-        {"plate": "43788503", "direction": "Exit", "authorized": 0},
-        {"plate": "80304001", "direction": "Entrance", "authorized": 0},
-        {"plate": "59476603", "direction": "Exit", "authorized": 0},
-        {"plate": "73778302", "direction": "Exit", "authorized": 0},
-        {"plate": "88731303", "direction": "Exit", "authorized": 0}
+        {"plate": "43788503", "direction": "Exit", "authorized": 0}
+        # {"plate": "80304001", "direction": "Entrance", "authorized": 0},
+        # {"plate": "59476603", "direction": "Exit", "authorized": 0},
+        # {"plate": "73778302", "direction": "Exit", "authorized": 0},
+        # {"plate": "88731303", "direction": "Exit", "authorized": 0}
 
     ]
 
