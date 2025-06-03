@@ -74,6 +74,7 @@ def process_frame(frame, edge_service):
 
             ocr_text, ocr_conf = cloud_response.get("ocr_result", (str(), 0.0))
             edge_service.update_tracked_vehicle(object_id, ocr_text, ocr_conf)
+            edge_service.log_results()
 
             # Trigger cooldown after successful recognition
             # trigger_cooldown(edge_service)
@@ -169,7 +170,7 @@ def main():
     # Start multiple frame processing workers
     for _ in range(NUM_WORKERS):
         threading.Thread(target=frame_worker, args=(edge_service,), daemon=True).start()
-    
+
     threading.Thread(target=poll_queue, args=(redis_client, edge_service), daemon=True).start()
 
     # Run FastAPI app
