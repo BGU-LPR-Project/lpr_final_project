@@ -8,9 +8,9 @@ import unittest
 import numpy as np
 import cv2
 from unittest.mock import Mock, patch, MagicMock
-from edge import EdgeService
+from edge_service.edge import EdgeService
 from cloud_service.formats import process_plate
-from bounding_box import BoundingBox
+from edge_service.bounding_box import BoundingBox
 
 class TestPipelineComponents(unittest.TestCase):
     @patch('edge_service.edge.YOLO')
