@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}LPR System{% endblock %}</title>
+
+    <style>
+        :root {
+            --bg: #121212;
+            --fg: #E0E0E0;
+            --accent: #BB86FC;
+            --card: #1F1F1F;
+            --card-hover: #2C2C2C;
+            --border: #333;
+            --button-bg: var(--card-hover);
+            --button-hover-bg: var(--accent);
+            --button-hover-color: #000;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--fg);
+            margin: 0;
+            display: grid;
+            grid-template-columns: 220px 1fr;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background-color: var(--card);
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border);
+            padding: 20px 0;
+        }
+
+        .sidebar h1 {
+            font-size: 20px;
+            color: var(--accent);
+            padding: 0 20px 16px;
+            margin: 0;
+            border-bottom: 1px solid var(--border);
+            font-weight: 700;
+        }
+
+        /* Smaller, tighter sidebar buttons */
+        .tab-btn {
+            background: none;
+            border: none;
+            color: var(--fg);
+            padding: 8px 16px;
+            /* reduced padding */
+            text-align: left;
+            cursor: pointer;
+            font-size: 14px;
+            /* smaller font */
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            /* smaller gap between icon and text */
+            transition: background-color 0.25s, color 0.25s;
+            font-weight: 600;
+            border-left: 4px solid transparent;
+        }
+
+        /* Smaller icons inside sidebar buttons */
+        .tab-btn svg {
+            width: 18px;
+            height: 18px;
+            stroke-width: 2;
+            flex-shrink: 0;
+        }
+
+        .tab-btn.active,
+        .tab-btn:hover {
+            background-color: var(--card-hover);
+            color: var(--accent);
+            border-left-color: var(--accent);
+        }
+
+        /* Main content */
+        .main-area {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            padding: 24px;
+            overflow-y: auto;
+        }
+
+        .tab-content {
+            display: none;
+            flex-grow: 1;
+            flex-direction: column;
+        }
+
+        .tab-content.active {
+            display: flex;
+        }
+
+        /* Panels */
+        .panel {
+            background-color: var(--card);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            margin-bottom: 20px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Stream box */
+        .stream-box {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            background-color: #1E1E1E;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            user-select: none;
+            margin-bottom: 20px;
+        }
+
+        .stream-box img,
+        .stream-box canvas {
+            width: 87%;
+            height: 87%;
+            object-fit: fill;
+            display: block;
+        }
+
+        .placeholder {
+            color: #666;
+            font-style: italic;
+            user-select: none;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: start;
+        }
+
+        .controls button {
+            background-color: var(--button-bg);
+            border: 1px solid var(--border);
+            color: var(--fg);
+            padding: 10px 18px;
+            font-size: 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: background-color 0.25s, color 0.25s;
+            font-weight: 600;
+            user-select: none;
+            min-width: 100px;
+            justify-content: center;
+        }
+
+        .controls button:hover {
+            background-color: var(--button-hover-bg);
+            color: var(--button-hover-color);
+        }
+
+        .controls button svg {
+            stroke: currentColor;
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+    </style>
+
+    {% block head_extra %}{% endblock %}
+</head>
+
+<body>
+    <div class="sidebar">
+        <h1>LPR System</h1>
+        {% include 'sidebar.html' %}
+    </div>
+
+    <main class="main-area">
+        {% block content %}{% endblock %}
+    </main>
+
+    <script>
+        // Tab switching logic
+        const tabs = document.querySelectorAll(".tab-btn");
+        const contents = document.querySelectorAll(".tab-content");
+
+        tabs.forEach(btn => {
+            btn.addEventListener("click", () => {
+                tabs.forEach(b => b.classList.remove("active"));
+                contents.forEach(c => c.classList.remove("active"));
+                btn.classList.add("active");
+                document.getElementById(btn.dataset.tab).classList.add("active");
+            });
+        });
+
+        // API call helper
+        function callApi(endpoint) {
+            fetch(endpoint, { method: 'POST' })
+                .then(res => res.text())
+                .then(msg => console.log(msg))
+                .catch(err => console.error("API call failed: " + err));
+        }
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>

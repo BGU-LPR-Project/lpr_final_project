@@ -86,7 +86,7 @@ class EdgeService:
         self.car_model = YOLO(car_model_path)    # Load YOLO model for car detection
         self.plate_model = YOLO(plate_model_path)  # Load YOLO model for license plate detection
         self.tracker = CentroidTracker()         # Initialize centroid-based object tracker
-        self.region_adjuster = RegionAdjuster(800, 600)  # Region of interest adjuster (currently unused)
+        self.region_adjuster = RegionAdjuster()  # Region of interest adjuster
         
         self.car_conf_threshold = car_conf_threshold    # Minimum confidence for car detections
         self.plate_conf_threshold = plate_conf_threshold  # Minimum confidence for plate detections
@@ -112,7 +112,7 @@ class EdgeService:
             return
 
         try:
-            roi_frame = frame  # Placeholder for potential ROI masking
+            roi_frame = self.region_adjuster.apply_roi_mask(frame)  # Placeholder for potential ROI masking
             motion_boxes = self.motion_detector.detect_motion(roi_frame)  # Detect motion regions
             detected_cars = self.detect_moving_cars(roi_frame, motion_boxes)  # Detect cars within motion
             detected_plates = self.detect_license_plate_boxes(roi_frame, detected_cars)  # Detect plates for cars
@@ -243,7 +243,7 @@ class EdgeService:
 
         return vertically_aligned and horizontally_aligned
 
-    def update_tracked_vehicle(self, vehicle_id, ocr_text, ocr_confidence):
+    def update_tracked_vehicle(self, vehicle_id, ocr_text, ocr_confidence, frame):
         """
         Update tracked vehicle info with new OCR plate text and confidence.
         Increments occurrence count if plate text matches previous; marks done if stable.
@@ -252,6 +252,7 @@ class EdgeService:
         prev_text = vehicle["plate_number"]
         prev_conf = vehicle["confidence"]
         occurs = vehicle["occurs"]
+        bbox = vehicle["bbox"]
 
         if ocr_text and ocr_confidence >= prev_conf:
             is_same_text = (ocr_text == prev_text)
@@ -261,6 +262,7 @@ class EdgeService:
                 "confidence": ocr_confidence,
                 "last_timestamp": datetime.now(),
                 "occurs": occurs + 1 if is_same_text else 0,
+                "direction": self.region_adjuster.is_in_entrance_or_exit(bbox, frame)
             })
             vehicle["done"] = vehicle["occurs"] >= 2
             self.tracker.update_tracked_plate(vehicle_id, ocr_text)
@@ -282,13 +284,13 @@ class EdgeService:
 
     def visualize(self, frame: np.ndarray, authorized: bool):
         """
-        Resize frame to 800x600 and draw bounding boxes, centroids, directions,
+        Resize frame to 960x540 and draw bounding boxes, centroids, directions,
         and plate info on tracked vehicles. Color boxes green if authorized,
         red otherwise.
         """
         original_h, original_w = frame.shape[:2]
-        new_h = 600
-        new_w = 800
+        new_h = 540
+        new_w = 960
 
         # Resize frame for visualization
         resized_frame = cv2.resize(frame, (new_w, new_h))
@@ -326,3 +328,9 @@ class EdgeService:
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
 
         return resized_frame
+
+    def load_region_config(self, region_data):
+        self.region_adjuster.load_region_config(region_data=region_data)
+
+    def unset_region_config(self):
+        self.region_adjuster.unset_region_config() 

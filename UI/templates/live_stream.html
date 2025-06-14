@@ -1,0 +1,73 @@
+<div id="main" class="tab-content active">
+    <div class="panel">
+        <div class="stream-box" role="region" aria-label="Live Camera Stream">
+            <img src="{{ url_for('video_feed') }}" alt="Live Feed"
+                onerror="this.style.display='none'; this.parentElement.innerHTML='<p class=\'placeholder\'>Waiting for frames...</p>';" />
+        </div>
+        <div class="controls" role="toolbar" aria-label="Video Controls"
+            style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+
+            <!-- Button Group (Left-Aligned) -->
+            <div class="button-group" style="display: flex; gap: 0.5rem;">
+                <button onclick="callApi('/start-video')" title="Start Stream">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2"
+                        viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M5 3v18l15-9z" />
+                    </svg> Start
+                </button>
+                <button onclick="callApi('/pause-video')" title="Pause Stream">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2"
+                        viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="6" y="4" width="4" height="16" />
+                        <rect x="14" y="4" width="4" height="16" />
+                    </svg> Pause
+                </button>
+                <button onclick="callApi('/resume-video')" title="Resume Stream">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2"
+                        viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M5 3v18l15-9z" />
+                    </svg> Resume
+                </button>
+                <button onclick="callApi('/restart-video')" title="Restart Stream">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2"
+                        viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M1 4v6h6" />
+                        <circle cx="12" cy="12" r="8" />
+                        <path d="M23 20v-6h-6" />
+                    </svg> Restart
+                </button>
+                <button onclick="callApi('/skip-10s')" title="Skip 10 Seconds">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2"
+                        viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 4l10 8-10 8V4z" />
+                        <path d="M14 4l6 8-6 8V4z" />
+                    </svg> +10s
+                </button>
+            </div>
+
+            <!-- Video selector dropdown -->
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <label for="videoSelect" style="font-size: 0.9rem; cursor: pointer;">Select Video:</label>
+                <select id="videoSelect" style="font-size: 0.9rem; min-width: 150px;">
+                    <option value="" disabled selected>-- Choose a video --</option>
+                </select>
+            </div>
+
+            <!-- Upload Form (Right-Aligned) -->
+            <form id="uploadForm" enctype="multipart/form-data" onsubmit="upload_video(event)"
+                style="display: flex; align-items: center; gap: 0.5rem;">
+                <label for="videoUpload" title="Upload a Video" style="cursor: pointer;">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2"
+                        viewBox="0 0 24 24" aria-hidden="true" style="width: 20px; height: 20px;">
+                        <path d="M4 16v1a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1M12 12V4m0 0L8 8m4-4 4 4" />
+                    </svg>
+                </label>
+                <input type="file" id="videoUpload" name="video" accept="video/*" style="display: none;" required>
+                <button type="submit" title="Upload Video" style="font-size: 0.9rem;">Upload</button>
+            </form>
+        </div>
+        <div>
+            <span id="uploadStatus" style="font-size: 0.85rem; color: gray; margin-left: 0.5rem;"></span>
+        </div>
+    </div>
+</div>

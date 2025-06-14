@@ -1,0 +1,325 @@
+{% block scripts %}
+<script>
+    const canvas = document.getElementById('regionCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let regionData = {
+        horizontal: [{ x: 0, y: 270 }, { x: 960, y: 270 }],
+        vertical: [{ x: 480, y: 270 }, { x: 480, y: 540 }]
+    };
+
+    let entranceOnLeft = true;
+    let dragging = null;
+    let image = new Image();
+
+    image.onload = () => {
+        draw();
+        const arrowBtn = document.getElementById('toggleArrowBtn');
+        if (arrowBtn) arrowBtn.style.visibility = 'visible';
+    };
+
+    function draw() {
+
+        if (!image.complete || image.naturalWidth === 0) {
+            console.warn("Image not ready, skipping draw");
+            return;
+        }
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+        const horizStart = regionData.horizontal[0];
+        const horizEnd = regionData.horizontal[1];
+        const vertTop = regionData.vertical[0];
+        const vertBottom = regionData.vertical[1];
+
+        // Compute bottom corners
+        const bottomLeft = { x: 0, y: canvas.height };
+        const bottomRight = { x: canvas.width, y: canvas.height };
+
+        // ---- RED: Out of Bounds (above horizontal line)
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(horizStart.x, horizStart.y);
+        ctx.lineTo(horizEnd.x, horizEnd.y);
+        ctx.lineTo(canvas.width, 0);
+        ctx.closePath();
+        ctx.fill();
+        drawOverlayLabel("Out of Bounds", canvas.width / 2, horizStart.y / 2);
+
+        // ---- Bottom Region (between horizontal and canvas bottom)
+        const lowerY = canvas.height;
+
+        if (entranceOnLeft) {
+            // ENTRANCE (left of vertical)
+            ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
+            ctx.beginPath();
+            ctx.moveTo(horizStart.x, horizStart.y);
+            ctx.lineTo(vertTop.x, vertTop.y);
+            ctx.lineTo(vertBottom.x, vertBottom.y);
+            ctx.lineTo(bottomLeft.x, bottomLeft.y);
+            ctx.lineTo(horizStart.x, horizStart.y);
+            ctx.closePath();
+            ctx.fill();
+            drawOverlayLabel("Entrance", (horizStart.x + vertTop.x) / 2, (vertTop.y + canvas.height) / 2);
+
+            // EXIT (right of vertical)
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.3)';
+            ctx.beginPath();
+            ctx.moveTo(vertTop.x, vertTop.y);
+            ctx.lineTo(horizEnd.x, horizEnd.y);
+            ctx.lineTo(bottomRight.x, bottomRight.y);
+            ctx.lineTo(vertBottom.x, vertBottom.y);
+            ctx.closePath();
+            ctx.fill();
+            drawOverlayLabel("Exit", (horizEnd.x + vertTop.x) / 2, (vertTop.y + canvas.height) / 2);
+        } else {
+            // EXIT (left of vertical)
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.3)';
+            ctx.beginPath();
+            ctx.moveTo(horizStart.x, horizStart.y);
+            ctx.lineTo(vertTop.x, vertTop.y);
+            ctx.lineTo(vertBottom.x, vertBottom.y);
+            ctx.lineTo(bottomLeft.x, bottomLeft.y);
+            ctx.lineTo(horizStart.x, horizStart.y);
+            ctx.closePath();
+            ctx.fill();
+            drawOverlayLabel("Exit", (horizStart.x + vertTop.x) / 2, (vertTop.y + canvas.height) / 2);
+
+            // ENTRANCE (right of vertical)
+            ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
+            ctx.beginPath();
+            ctx.moveTo(vertTop.x, vertTop.y);
+            ctx.lineTo(horizEnd.x, horizEnd.y);
+            ctx.lineTo(bottomRight.x, bottomRight.y);
+            ctx.lineTo(vertBottom.x, vertBottom.y);
+            ctx.closePath();
+            ctx.fill();
+            drawOverlayLabel("Entrance", (horizEnd.x + vertTop.x) / 2, (vertTop.y + canvas.height) / 2);
+        }
+
+        // ---- Draw guide lines
+        ctx.strokeStyle = 'lime';
+        ctx.lineWidth = 2;
+
+        ctx.beginPath();
+        ctx.moveTo(horizStart.x, horizStart.y);
+        ctx.lineTo(horizEnd.x, horizEnd.y);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(vertTop.x, vertTop.y);
+        ctx.lineTo(vertBottom.x, vertBottom.y);
+        ctx.stroke();
+
+        // ---- Draw draggable dots
+        ctx.fillStyle = 'cyan';
+        [...regionData.horizontal, ...regionData.vertical].forEach(pt => {
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, 5, 0, 2 * Math.PI);
+            ctx.fill();
+        });
+
+        const arrowBtn = document.getElementById('toggleArrowBtn');
+        if (arrowBtn) {
+            const midX = (vertTop.x + vertBottom.x) / 2;
+            const midY = (vertTop.y + vertBottom.y) / 2;
+            arrowBtn.style.left = `${midX - arrowBtn.offsetWidth / 2}px`;
+            arrowBtn.style.top = `${midY - arrowBtn.offsetHeight / 2}px`;
+        }
+    }
+
+    function drawOverlayLabel(text, x, y) {
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(text, x, y);
+    }
+
+
+    function drawRegion(x, y, w, h, color, label) {
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, w, h);
+
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(label, x + w / 2, y + h / 2);
+    }
+
+    canvas.addEventListener('mousedown', e => {
+        const { x, y } = getMouseCoords(e);
+        [...regionData.horizontal, ...regionData.vertical].forEach((pt, i) => {
+            if (Math.hypot(pt.x - x, pt.y - y) < 10) dragging = i;
+        });
+    });
+
+    canvas.addEventListener('mousemove', e => {
+        if (dragging !== null) {
+            const { x, y } = getMouseCoords(e);
+            const clampedX = Math.max(0, Math.min(canvas.width, x));
+            const clampedY = Math.max(0, Math.min(canvas.height, y));
+
+            if (dragging < 2) {
+                regionData.horizontal[dragging].y = clampedY;
+                regionData.vertical[0] = getPointOnLine(
+                    regionData.horizontal[0],
+                    regionData.horizontal[1],
+                    regionData.vertical[0].x
+                );
+            } else {
+                regionData.vertical[dragging - 2].x = clampedX;
+                if (dragging === 3) regionData.vertical[1].y = canvas.height;
+                regionData.vertical[0] = getPointOnLine(
+                    regionData.horizontal[0],
+                    regionData.horizontal[1],
+                    regionData.vertical[0].x
+                );
+            }
+
+            draw();
+        }
+    });
+
+    canvas.addEventListener('mouseup', () => dragging = null);
+
+    function getMouseCoords(e) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+
+        return {
+            x: (e.clientX - rect.left) * scaleX,
+            y: (e.clientY - rect.top) * scaleY
+        };
+    }
+
+    function getPointOnLine(p1, p2, x) {
+        if (p1.x === p2.x) return { x: p1.x, y: p1.y };
+        const slope = (p2.y - p1.y) / (p2.x - p1.x);
+        const y = p1.y + slope * (x - p1.x);
+        return { x, y };
+    }
+
+    function loadSingleFrame() {
+        image.src = '/single_frame?' + new Date().getTime();
+    }
+
+    function sendRegionData() {
+        const payload = {
+            ...regionData,
+            entranceSide: entranceOnLeft ? 'left' : 'right'  // add this
+        };
+
+        fetch('/set-regions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+            .then(res => res.text())
+            .then(msg => alert("Saved regions successfully."))
+            .catch(() => alert("Failed to save regions."));
+    }
+
+    function toggleEntranceSide() {
+        entranceOnLeft = !entranceOnLeft;
+        draw();
+    }
+
+    function unsetRegionData() {
+        if (!confirm("Are you sure you want to unset the region configuration?")) return;
+
+        fetch('/set-regions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ unset: true })  // You can define the expected signal
+        })
+            .then(response => {
+                if (response.ok) {
+                    alert("Region configuration was unset.");
+                } else {
+                    alert("Failed to unset region configuration.");
+                }
+            })
+            .catch(error => {
+                console.error("Error unsetting region config:", error);
+                alert("An error occurred while unsetting region configuration.");
+            });
+    }
+
+
+    window.toggleEntranceSide = toggleEntranceSide;
+
+    async function upload_video(event) {
+        event.preventDefault();
+        const fileInput = document.getElementById('videoUpload');
+        const file = fileInput.files[0];
+        if (!file) return alert("Please select a video file first.");
+
+        const formData = new FormData();
+        formData.append('video', file);
+
+        const status = document.getElementById('uploadStatus');
+        status.textContent = "Uploading...";
+        status.style.color = "gray";
+
+        try {
+            const response = await fetch('/upload-video', {
+                method: 'POST',
+                body: formData
+            });
+            if (!response.ok) throw new Error();
+
+            // On success, show just the filename
+            status.textContent = `Upload successful: ${file.name}`;
+            status.style.color = "green";
+        } catch {
+            status.textContent = "Upload failed";
+            status.style.color = "red";
+        }
+    }
+    async function fetchVideoList() {
+        try {
+            const res = await fetch('/list-videos');
+            if (!res.ok) throw new Error('Failed to fetch video list');
+            const videos = await res.json();
+            const select = document.getElementById('videoSelect');
+            // Clear existing options except placeholder
+            select.innerHTML = '<option value="" disabled selected>-- Choose a video --</option>';
+            videos.forEach(v => {
+                const option = document.createElement('option');
+                option.value = v;
+                option.textContent = v;
+                select.appendChild(option);
+            });
+        } catch (err) {
+            console.error('Error fetching video list:', err);
+        }
+    }
+
+    document.getElementById('videoSelect').addEventListener('change', async function () {
+        const selectedPath = this.value;
+        if (!selectedPath) return;
+        try {
+            const res = await fetch('/set-video-path', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: selectedPath })
+            });
+            if (!res.ok) throw new Error('Failed to update video path');
+            console.log('Video path updated:', selectedPath);
+        } catch (err) {
+            console.error('Error updating video path:', err);
+        }
+    });
+
+
+    // Call fetchVideoList once when page loads
+    window.addEventListener('DOMContentLoaded', fetchVideoList);
+
+
+</script>
+{% endblock %}

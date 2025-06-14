@@ -38,7 +38,7 @@ class CentroidTracker:
                 "bbox": bbox,
                 "plate_number": str(),  # Empty string initially
                 "plate_box": None,
-                "direction": None,
+                "direction": "N/A",
                 "confidence": 0.0,
                 "last_timestamp": datetime.now(),
                 "occurs": 0,

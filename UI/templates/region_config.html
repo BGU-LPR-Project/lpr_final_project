@@ -1,0 +1,56 @@
+<div id="region" class="tab-content">
+    <div class="panel">
+        <div class="stream-box" role="region" aria-label="Region Configuration Canvas">
+            <style>
+                #toggleArrowBtn {
+                    position: absolute;
+                    width: 30px;
+                    height: 30px;
+                    border: none;
+                    background: rgba(0, 0, 0, 0.6);
+                    color: white;
+                    font-size: 18px;
+                    border-radius: 50%;
+                    cursor: pointer;
+                    z-index: 10;
+                    line-height: 30px;
+                    text-align: center;
+                    visibility: hidden;
+                }
+            </style>
+
+            <div style="position: relative;">
+                <canvas id="regionCanvas" width="960" height="540" style="width: 960px; height: 540px;"></canvas>
+                <button id="toggleArrowBtn" onclick="toggleEntranceSide()">⇄</button>
+            </div>
+
+        </div>
+        <div class="controls" role="toolbar" aria-label="Region Config Controls">
+            <button onclick="loadSingleFrame()" title="Load Frame">
+                <!-- Image icon -->
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2"
+                    viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <path d="M21 15l-5-5L5 21" />
+                </svg> Load Frame
+            </button>
+            <button onclick="sendRegionData()" title="Save Region">
+                <!-- Save icon -->
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2"
+                    viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                    <polyline points="17 21 17 13 7 13 7 21" />
+                </svg> Save Region
+            </button>
+            <button onclick="unsetRegionData()" title="Unset Region">
+                <!-- Trash icon -->
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2"
+                    viewBox="0 0 24 24" aria-hidden="true">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6m5-3h4a2 2 0 0 1 2 2v1H8V5a2 2 0 0 1 2-2z" />
+                </svg> Unset Region
+            </button>
+        </div>
+    </div>
+</div>

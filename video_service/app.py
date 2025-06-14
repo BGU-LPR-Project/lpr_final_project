@@ -4,9 +4,11 @@ import pickle
 import uvicorn
 import threading
 import requests
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File
 from pydantic import BaseModel
 from video_handler import VideoHandler
+import os
+import shutil
 
 app = FastAPI()
 
@@ -73,12 +75,16 @@ def process_video(video_path_or_stream: str):
 
 @app.post("/start-video")
 def start_video(input: VideoInput):
-    """Starts video processing in a new thread if not already running."""
+    """Stops any running video and starts new processing in a fresh thread."""
     with state["lock"]:
+        # If video is running, signal it to stop
         if state["thread"] and state["thread"].is_alive():
-            return {"message": "Video processing already running."}
+            stop_video()
+            state["thread"].join()
+            state["thread"] = None
+            print("Previous video processing stopped.")
 
-        # Set up state and start processing
+        # Start new video
         state["video_path"] = input.path
         state["pause_event"].clear()
         state["stop_event"].clear()
@@ -89,6 +95,7 @@ def start_video(input: VideoInput):
         state["thread"] = t
 
     return {"message": f"Started processing {input.path}"}
+
 
 @app.post("/pause-video")
 def pause_video():
@@ -139,6 +146,24 @@ def skip_10_seconds():
 
     handler.seek(10 - seconds_skipped)  # Skip the rest locally
     return {"message": "10 seconds skipped."}
+
+@app.post("/save-video")
+async def save_video(video: UploadFile = File(...)):
+    SAVE_DIR = "recordings"
+    os.makedirs(SAVE_DIR, exist_ok=True)
+    try:
+        file_location = os.path.join(SAVE_DIR, video.filename)
+        with open(file_location, "wb") as buffer:
+            shutil.copyfileobj(video.file, buffer)
+        return f"Saved {video.filename} in container."
+    except Exception as e:
+        return f"Error saving file: {e}"
+
+@app.get("/list-videos")
+async def list_videos():
+    files = os.listdir('recordings')  # adjust your folder path
+    video_files = [f for f in files if f.lower().endswith(('.mp4', '.avi', '.mov', '.mkv'))]
+    return video_files  # FastAPI converts list to JSON automatically
 
 
 if __name__ == "__main__":

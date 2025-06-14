@@ -3,3 +3,4 @@ fastapi
 uvicorn
 redis
 requests
+python-multipart

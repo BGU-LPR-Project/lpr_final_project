@@ -7,9 +7,10 @@ import requests
 import pickle
 import uvicorn
 import logging
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
 from edge import EdgeService
 from queue import Queue, Empty
+from itertools import count
 
 VISUAL_FRAME_QUEUE = "visual_frame_queue"
 
@@ -18,6 +19,7 @@ PAUSED = threading.Event()    # Used to pause processing
 
 # Constants
 FRAME_QUEUE = Queue(maxsize=30)  # Bounded queue to control memory usage
+frame_counter = count()  # Global atomic counter
 
 # FastAPI app initialization
 app = FastAPI()
@@ -49,7 +51,7 @@ def connect_to_redis():
             time.sleep(1)
     return client
 
-def process_frame(frame, edge_service):
+def process_frame(seq, frame, edge_service):
     """Runs prediction on a frame, sends to cloud for OCR, and pushes visual output."""
     print("Processing frame in worker thread.")
     result = {}
@@ -75,25 +77,27 @@ def process_frame(frame, edge_service):
             ).json()
 
             ocr_text, ocr_conf = cloud_response.get("ocr_result", (str(), 0.0))
-            edge_service.update_tracked_vehicle(object_id, ocr_text, ocr_conf)
+            edge_service.update_tracked_vehicle(object_id, ocr_text, ocr_conf, frame)
 
             # Optional: cooldown after successful recognition
             # trigger_cooldown(edge_service)
         except Exception as e:
             print(f"cloud predict api failed: {e}")
 
-    # Push visualized output to Redis for frontend use
     annotated_frame = edge_service.visualize(frame, True)
-    redis_client.rpush(VISUAL_FRAME_QUEUE, pickle.dumps(annotated_frame))
+
+    # Push tuple (seq, frame) to Redis for sorting later
+    redis_client.rpush(VISUAL_FRAME_QUEUE, pickle.dumps((seq, annotated_frame)))
 
 def poll_queue(redis_client, edge_service):
-    """Continuously polls Redis for new frames and enqueues them for processing."""
+    """Continuously polls Redis for new frames and enqueues them with sequence number."""
     while True:
         frame_data = redis_client.lpop("frame_queue")
         if frame_data:
             frame = pickle.loads(frame_data)
+            seq = next(frame_counter)
             try:
-                FRAME_QUEUE.put(frame, timeout=0.1)
+                FRAME_QUEUE.put((seq, frame), timeout=0.1)
             except:
                 print("Frame queue is full. Dropping frame.")
 
@@ -101,19 +105,20 @@ def frame_worker(edge_service):
     """Consumes frames from queue and processes them using the edge service."""
     while True:
         if not PAUSED.is_set():
-            frame = FRAME_QUEUE.get()
+            seq, frame = FRAME_QUEUE.get()
             if COOLDOWN.is_set():
                 print("Cooldown active. Dropping frame.")
                 FRAME_QUEUE.task_done()
                 continue
             try:
-                process_frame(frame, edge_service)
+                process_frame(seq, frame, edge_service)
             except Exception as e:
                 print(f"Error processing frame: {e}")
             finally:
                 FRAME_QUEUE.task_done()
         else:
             time.sleep(1)
+
 
 def clear_thread_queue():
     """Clears all frames from the thread-safe processing queue."""
@@ -159,6 +164,23 @@ async def skip():
     seconds_skipped = frames_skipped // 4  # Assumes 4 FPS
     return {"seconds_skipped": seconds_skipped}
 
+@app.post("/set-regions")
+async def set_regions(request: Request):
+    try:
+        data = await request.json()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON: {e}")
+
+    try:
+        if data.get("unset"):
+            edge_service.unset_region_config()
+            return "Region config was unset.", 200
+        else:
+            edge_service.load_region_config(data)
+            return "Region config was loaded.", 200
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing region config: {e}")
+
 @app.get("/healthcheck")
 async def healthcheck():
     """Checks if the edge service is running."""
@@ -166,13 +188,13 @@ async def healthcheck():
 
 def main():
     """Initializes services, starts worker threads, and runs the FastAPI app."""
-    global redis_client
+    global redis_client, edge_service
     redis_client = connect_to_redis()
     edge_service = EdgeService("/app/models/yolo11n.pt", "/app/models/license_plate_detector.pt")
     edge_service.on()
 
     # Start the worker thread and polling thread
-    NUM_WORKERS = 4  # Adjust based on your CPU and memory capacity
+    NUM_WORKERS = 3  # Adjust based on your CPU and memory capacity
 
     for _ in range(NUM_WORKERS):
         threading.Thread(target=frame_worker, args=(edge_service,), daemon=True).start()
