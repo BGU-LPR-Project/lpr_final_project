@@ -82,6 +82,9 @@ def process_frame(frame, edge_service):
         except Exception as e:
             print(f"cloud predict api failed: {e}")
 
+    # Log results to Redis for test script to retrieve
+    edge_service.log_results()
+
     # Push visualized output to Redis for frontend use
     annotated_frame = edge_service.visualize(frame, True)
     redis_client.rpush(VISUAL_FRAME_QUEUE, pickle.dumps(annotated_frame))

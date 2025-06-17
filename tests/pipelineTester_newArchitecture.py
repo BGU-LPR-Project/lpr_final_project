@@ -32,6 +32,7 @@ class pipelineTesterMicroservice:
 
         timeout = 30
         last_frame_time = time.time()
+        frame_count = 0
 
         while True:
             frame = handler.decode_frame()
@@ -44,11 +45,15 @@ class pipelineTesterMicroservice:
 
             frame_data = pickle.dumps(frame)
             self.redis_client.rpush("frame_queue", frame_data)
+            frame_count += 1
+            if frame_count % 10 == 0:
+                print(f"Pushed {frame_count} frames to Redis")
             time.sleep(0.2)
 
+        print(f"Total frames pushed: {frame_count}")
         handler.release_resources()
 
-    def wait_for_results(self, timeout=15):
+    def wait_for_results(self, timeout=60):
         print("Waiting for results...")
         start_time = time.time()
         results = []
@@ -57,8 +62,16 @@ class pipelineTesterMicroservice:
             try:
                 data = self.redis_client.get("tracked_plates")
                 if data:
+                    print("Found data in Redis")
                     results = pickle.loads(data)
-                    break
+                    print(f"Unpickled results: {results}")
+                    # Only break if we have actual results, not empty list
+                    if results and len(results) > 0:
+                        break
+                    else:
+                        print("Results are empty, continuing to wait...")
+                else:
+                    print("No data found in Redis yet...")
             except Exception as e:
                 print(f"Error while fetching results: {e}")
             time.sleep(1)
