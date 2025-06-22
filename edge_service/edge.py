@@ -94,6 +94,9 @@ class EdgeService:
         self.active = False            # Service state flag
         self.lock = threading.RLock()  # Thread-safe lock for concurrent access
 
+        self.auth_cache = {"whitelist": set(), "blacklist": set()}
+
+
     def off(self):
         """Deactivate the service."""
         self.active = False
@@ -282,11 +285,16 @@ class EdgeService:
         for object_id, plate in self.tracker.tracked_plates.items():
             print(f"ID: {object_id} - Plate: {plate}")
 
-    def visualize(self, frame: np.ndarray, authorized: bool):
+    def visualize(self, frame: np.ndarray):
         """
         Resize frame to 960x540 and draw bounding boxes, centroids, directions,
-        and plate info on tracked vehicles. Color boxes green if authorized,
-        red otherwise.
+        and plate info on tracked vehicles.
+        Color boxes green if plate in whitelist,
+        red if in blacklist,
+        yellow otherwise,
+        white if no plate info.
+        
+        authorization_data: dict with keys 'whitelist' and 'blacklist', each a list of plates.
         """
         original_h, original_w = frame.shape[:2]
         new_h = 540
@@ -299,6 +307,9 @@ class EdgeService:
         scale_x = new_w / original_w
         scale_y = new_h / original_h
 
+        whitelist = self.auth_cache.get("whitelist", set())
+        blacklist = self.auth_cache.get("blacklist", set())
+
         for object_id, data in self.tracker.objects.items():
             centroid = data["centroid"]
             bbox = data["bbox"]
@@ -310,8 +321,16 @@ class EdgeService:
             x1, y1, x2, y2 = [int(coord * scale) for coord, scale in zip(bbox, [scale_x, scale_y, scale_x, scale_y])]
             cx, cy = int(centroid[0] * scale_x), int(centroid[1] * scale_y)
 
-            # Choose box color based on authorization status
-            box_color = (0, 255, 0) if authorized == 1 else ((0, 0, 255) if authorized == -1 else (0, 0, 255))
+            # Determine box color based on authorization lists
+            if plate_number:
+                if plate_number in whitelist:
+                    box_color = (0, 255, 0)        # Green
+                elif plate_number in blacklist:
+                    box_color = (0, 0, 255)        # Red
+                else:
+                    box_color = (0, 255, 255)      # Yellow (unknown plate)
+            else:
+                box_color = (255, 255, 255)        # White (no plate info)
 
             # Draw bounding box and centroid
             cv2.rectangle(resized_frame, (x1, y1), (x2, y2), box_color, 1)
@@ -328,6 +347,20 @@ class EdgeService:
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
 
         return resized_frame
+
+
+    def update_auth_cache(self, auth_dict: dict):
+        with self.lock:
+            self.auth_cache["whitelist"] = set(auth_dict.get("whitelist", []))
+            self.auth_cache["blacklist"] = set(auth_dict.get("blacklist", []))
+
+    def get_auth_status(self, plate: str) -> int:
+        with self.lock:
+            if plate in self.auth_cache["blacklist"]:
+                return -1
+            if plate in self.auth_cache["whitelist"]:
+                return 1
+            return 0
 
     def load_region_config(self, region_data):
         self.region_adjuster.load_region_config(region_data=region_data)

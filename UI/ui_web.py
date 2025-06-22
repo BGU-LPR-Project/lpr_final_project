@@ -1,20 +1,55 @@
-from flask import Flask, render_template, Response, request, jsonify
+from flask import Flask, render_template, Response, request, jsonify, abort, redirect, url_for, session
 import cv2
 import redis
 import pickle
 import requests
 import time
-from collections import deque
+from auth_utils import verify_credentials
+import os
 
 app = Flask(__name__)
 r = redis.Redis(host='localhost', port=6379, db=0)
 queue_name = 'visual_frame_queue'
-current_video_path = "/app/recordings/rec6.mp4"
+current_video_path = "/app/recordings/fullMovie20250420_11.mp4"
 last_frame = None
 
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "unsafe-default-dev-key")
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        if verify_credentials(username, password):
+            session['username'] = username
+            session['logged_in'] = True
+            return redirect(url_for('home'))
+        else:
+            return render_template('login.html', error="Invalid credentials")
+    else:
+        # GET request: just show login form
+        return render_template('login.html')
+
+@app.route('/logout', methods=['GET', 'POST'])
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+# Example of protected route
 @app.route('/')
-def index():
+def home():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
     return render_template('index.html')
+
+@app.before_request
+def require_login():
+    allowed_routes = ['login', 'static', 'logout']  # add logout and any other open routes
+    if request.endpoint is None:
+        return  # Let Flask handle 404 etc.
+    if request.endpoint not in allowed_routes and not session.get('logged_in'):
+        return redirect(url_for('login'))
 
 def generate():
     global last_frame
@@ -43,6 +78,70 @@ def generate():
         else:
             time.sleep(0.05)
 
+@app.route('/video_feed')
+def video_feed():
+    # MJPEG video stream
+    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/auth-lists', methods=['GET'])
+def get_auth_lists():
+    """Proxy GET /auth-lists to cloud service."""
+    try:
+        resp = requests.get(f"http://localhost:8002/auth-lists")
+        resp.raise_for_status()
+        return jsonify(resp.json())
+    except requests.RequestException as e:
+        return jsonify({"detail": "Failed to fetch authorization lists"}), 500
+
+
+@app.route('/auth-lists/<list_type>', methods=['POST'])
+def add_plate(list_type):
+    """Proxy POST /auth-lists/{whitelist|blacklist} to cloud service."""
+    if list_type not in ['whitelist', 'blacklist']:
+        abort(404, description="Invalid list type")
+
+    plate_data = request.get_json()
+    if not plate_data or 'plate' not in plate_data:
+        abort(400, description="Missing plate in request body")
+
+    try:
+        resp = requests.post(
+            f"http://localhost:8002/auth-lists/{list_type}",
+            json={"plate": plate_data['plate']}
+        )
+        resp.raise_for_status()
+        return jsonify(resp.json()), resp.status_code
+    except requests.RequestException as e:
+        return jsonify({"detail": f"Failed to add plate to {list_type}"}), 500
+
+
+@app.route('/auth-lists/<list_type>/<plate>', methods=['DELETE'])
+def delete_plate(list_type, plate):
+    """Proxy DELETE /auth-lists/{whitelist|blacklist}/{plate} to cloud service."""
+    if list_type not in ['whitelist', 'blacklist']:
+        abort(404, description="Invalid list type")
+
+    try:
+        resp = requests.delete(f"http://localhost:8002/auth-lists/{list_type}/{plate}")
+        resp.raise_for_status()
+        return jsonify(resp.json()), resp.status_code
+    except requests.RequestException as e:
+        return jsonify({"detail": f"Failed to delete plate from {list_type}"}), 500
+
+@app.route('/formats/<string:name>', methods=['DELETE'])
+def delete_format_proxy(name):
+    resp = requests.delete(f'http://localhost:8002/formats/{name}')
+    return Response(resp.content, status=resp.status_code, content_type=resp.headers['content-type'])
+
+@app.route('/formats', methods=['GET', 'POST'])
+def formats_proxy():
+    if request.method == 'GET':
+        resp = requests.get(f'http://localhost:8002/formats')
+        return Response(resp.content, status=resp.status_code, content_type=resp.headers['content-type'])
+    elif request.method == 'POST':
+        resp = requests.post(f'http://localhost:8002/formats', json=request.json)
+        return Response(resp.content, status=resp.status_code, content_type=resp.headers['content-type'])
+
 @app.route('/set-video-path', methods=['POST'])
 def set_video_path():
     global current_video_path
@@ -65,7 +164,6 @@ def list_videos():
     except Exception as e:
         return jsonify({'error': f'Failed to fetch videos from container: {str(e)}'}), 500
 
-
 @app.route('/upload-video', methods=['POST'])
 def upload_video():
     if 'video' not in request.files:
@@ -81,12 +179,6 @@ def upload_video():
         return jsonify({'error': f'Failed to send to container: {str(e)}'}), 500
 
     return jsonify({'message': f'Uploaded and forwarded to container: {video.filename}'})
-
-
-@app.route('/video_feed')
-def video_feed():
-    # MJPEG video stream
-    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/single_frame')
 def single_frame():
@@ -146,4 +238,4 @@ def proxy_api(endpoint):
         return f"Failed to reach backend API: {e}", 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)

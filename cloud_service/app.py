@@ -1,10 +1,12 @@
 import base64
 import cv2
 import numpy as np
+from typing import Dict
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 from cloud import CloudService
+import requests
 
 # Initialize FastAPI app and cloud-based OCR service
 app = FastAPI()
@@ -18,6 +20,14 @@ class PlateImage(BaseModel):
 # Output data model for OCR results
 class OCRResult(BaseModel):
     ocr_result: tuple  # Tuple containing (recognized_text, confidence)
+
+class PlateRequest(BaseModel):
+    plate: str
+
+# Model for adding a new format
+class FormatAddRequest(BaseModel):
+    name: str
+    pattern: str
 
 def predict_plate_img(plate_img: np.ndarray):
     """
@@ -68,6 +78,96 @@ async def predict(plate_image: PlateImage):
     except Exception as e:
         print(f"An error occurred: {e}")
         raise HTTPException(status_code=500, detail="An error occurred during prediction")
+
+def notify_edge_service_update():
+    try:
+        auth_lists = cloud_service.get_authorization_lists()  # your dict payload
+        response = requests.post(
+            'http://edge_service:8000/update-auth-cache',
+            json=auth_lists  # send the dict as JSON payload
+        )
+        response.raise_for_status()
+    except Exception as e:
+        print(f"[WARNING] Failed to notify edge service to update auth cache: {e}")
+
+@app.get("/auth-lists")
+async def get_auth_lists():
+    return cloud_service.get_authorization_lists()
+
+@app.get("/auth-status")
+async def get_auth_status(plate: str = Query(..., description="License plate to check")):
+    status = cloud_service.check_plate_authorization(plate)
+    return {"plate": plate, "status": status}
+
+@app.post("/auth-lists/whitelist")
+async def add_whitelist(plate_req: PlateRequest):
+    success = cloud_service.add_to_whitelist(plate_req.plate)
+    if not success:
+        raise HTTPException(status_code=400, detail="Plate already in whitelist")
+    notify_edge_service_update()
+    return {"message": f"Plate {plate_req.plate} added to whitelist."}
+
+@app.post("/auth-lists/blacklist")
+async def add_blacklist(plate_req: PlateRequest):
+    success = cloud_service.add_to_blacklist(plate_req.plate)
+    if not success:
+        raise HTTPException(status_code=400, detail="Plate already in blacklist")
+    notify_edge_service_update()
+    return {"message": f"Plate {plate_req.plate} added to blacklist."}
+
+@app.delete("/auth-lists/whitelist/{plate}")
+async def remove_whitelist(plate: str):
+    success = cloud_service.remove_from_whitelist(plate)
+    if not success:
+        raise HTTPException(status_code=404, detail="Plate not found in whitelist")
+    notify_edge_service_update()
+    return {"message": f"Plate {plate} removed from whitelist."}
+
+@app.delete("/auth-lists/blacklist/{plate}")
+async def remove_blacklist(plate: str):
+    success = cloud_service.remove_from_blacklist(plate)
+    if not success:
+        raise HTTPException(status_code=404, detail="Plate not found in blacklist")
+    notify_edge_service_update()
+    return {"message": f"Plate {plate} removed from blacklist."}
+
+@app.get("/formats", response_model=Dict[str, str])
+async def get_formats():
+    """
+    Retrieve all license plate formats from backend.
+    Returns a dict of format_name -> regex_pattern.
+    """
+    try:
+        formats = cloud_service.get_formats()  # Expected dict[str, str]
+        return formats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch formats: {e}")
+
+@app.post("/formats")
+async def add_format(format_req: FormatAddRequest):
+    """
+    Add a new license plate format.
+    """
+    try:
+        success = cloud_service.add_format(format_req.name, format_req.pattern)
+        if not success:
+            raise HTTPException(status_code=400, detail="Failed to add format (duplicate or invalid).")
+        return {"message": f"Format '{format_req.name}' added successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to add format: {e}")
+
+@app.delete("/formats/{name}")
+async def delete_format(name: str):
+    """
+    Delete a license plate format by name.
+    """
+    try:
+        success = cloud_service.delete_format(name)
+        if not success:
+            raise HTTPException(status_code=404, detail=f"Format '{name}' not found.")
+        return {"message": f"Format '{name}' deleted successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete format: {e}")
 
 @app.get("/healthcheck")
 async def healthcheck():

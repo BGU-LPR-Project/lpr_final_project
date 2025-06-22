@@ -316,9 +316,211 @@
         }
     });
 
+    async function fetchFormats() {
+        try {
+            // Call Flask endpoint which forwards to FastAPI backend
+            const res = await fetch('/formats');
+            if (!res.ok) throw new Error('Failed to fetch formats');
 
-    // Call fetchVideoList once when page loads
-    window.addEventListener('DOMContentLoaded', fetchVideoList);
+            const formats = await res.json();
+
+            const tbody = document.getElementById('formatList');
+            tbody.innerHTML = '';  // Clear existing rows
+
+            Object.entries(formats).forEach(([name, pattern]) => {
+                const row = document.createElement('tr');
+                row.style.borderBottom = '1px solid #444';
+
+                const nameCell = document.createElement('td');
+                nameCell.textContent = name;
+                nameCell.style.padding = '0.5rem 1rem';
+                nameCell.style.color = '#ddd';
+
+                const patternCell = document.createElement('td');
+                patternCell.textContent = pattern;
+                patternCell.style.padding = '0.5rem 1rem';
+                patternCell.style.fontFamily = 'monospace';
+                patternCell.style.color = '#ccc';
+
+                const actionCell = document.createElement('td');
+                actionCell.style.textAlign = 'center';
+                actionCell.style.padding = '0.5rem 1rem';
+
+                const delBtn = document.createElement('button');
+                delBtn.textContent = 'Delete';
+                delBtn.style.padding = '0.3rem 0.6rem';
+                delBtn.style.borderRadius = '3px';
+                delBtn.style.border = 'none';
+                delBtn.style.backgroundColor = '#555';
+                delBtn.style.color = '#ccc';
+                delBtn.style.cursor = 'pointer';
+
+                delBtn.addEventListener('click', () => deleteFormat(name));
+
+                actionCell.appendChild(delBtn);
+
+                row.appendChild(nameCell);
+                row.appendChild(patternCell);
+                row.appendChild(actionCell);
+
+                tbody.appendChild(row);
+            });
+        } catch (err) {
+            console.error("Error fetching formats:", err);
+            alert('Failed to load plate formats.');
+        }
+    }
+
+    async function deleteFormat(name) {
+        if (!confirm(`Delete format "${name}"?`)) return;
+
+        try {
+            const res = await fetch(`/formats/${encodeURIComponent(name)}`, {
+                method: 'DELETE'
+            });
+            if (!res.ok) throw new Error('Failed to delete format');
+
+            await fetchFormats(); // Refresh list
+        } catch (err) {
+            console.error("Failed to delete format:", err);
+            alert('Failed to delete format.');
+        }
+    }
+
+    async function addFormat(event) {
+        event.preventDefault();
+        const nameInput = document.getElementById('formatName');
+        const patternInput = document.getElementById('formatRegex');
+
+        const name = nameInput.value.trim();
+        const pattern = patternInput.value.trim();
+
+        if (!name || !pattern) {
+            alert("Both format name and regex pattern are required.");
+            return;
+        }
+
+        try {
+            const res = await fetch('/formats', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, pattern })
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(errText || 'Failed to add format');
+            }
+
+            // Clear inputs on success
+            nameInput.value = '';
+            patternInput.value = '';
+
+            // Refresh the format list
+            await fetchFormats();
+        } catch (err) {
+            console.error("Error adding format:", err);
+            alert('Failed to add format. Check console for details.');
+        }
+    }
+
+    // Call this once on page load or tab open to bind form submit handler
+    document.getElementById('addFormatForm').addEventListener('submit', addFormat);
+
+
+    document.getElementById('startBtn').addEventListener('click', async () => {
+        const liveImg = document.getElementById('liveStreamImg');
+        const placeholder = document.getElementById('placeholder');
+        const placeholderText = document.getElementById('placeholderText');
+        const startSpinner = document.getElementById('startSpinner');
+
+        try {
+            // Show spinner + message
+            startSpinner.style.display = 'block';
+            placeholderText.textContent = '';
+            placeholder.style.display = 'block';
+            liveImg.style.display = 'none';
+
+            const res = await fetch('/start-video', { method: 'POST' });
+            if (!res.ok) throw new Error('Backend responded with an error.');
+
+            // Start stream
+            liveImg.src = '/video_feed?' + Date.now();
+            liveImg.style.display = 'block';
+
+        } catch (error) {
+            console.error("Failed to start video stream:", error);
+            placeholderText.textContent = '❌ Failed to start stream. Please try again.';
+            liveImg.style.display = 'none';
+        } finally {
+            startSpinner.style.display = 'none';
+        }
+    });
+
+    async function fetchAuthLists() {
+        try {
+            const res = await fetch('/auth-lists');
+            if (!res.ok) throw new Error('Failed to fetch authorization lists');
+            const { whitelist, blacklist } = await res.json();
+            renderList('whitelist', whitelist);
+            renderList('blacklist', blacklist);
+        } catch (error) {
+            console.error('Error fetching auth lists:', error);
+        }
+    }
+
+    function renderList(type, list) {
+        const ul = document.getElementById(`${type}List`);
+        ul.innerHTML = '';
+        list.forEach(plate => {
+            const li = document.createElement('li');
+            li.textContent = plate;
+            const btn = document.createElement('button');
+            btn.textContent = 'Delete';
+            btn.onclick = () => deletePlate(type, plate);
+            li.appendChild(btn);
+            ul.appendChild(li);
+        });
+    }
+
+    async function addPlate(type) {
+        const input = document.getElementById(`${type}Input`);
+        const plate = input.value.trim();
+        if (!plate) return;
+
+        try {
+            const res = await fetch(`/auth-lists/${type}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ plate })
+            });
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.detail || 'Failed to add plate');
+            }
+            input.value = '';
+            fetchAuthLists();
+        } catch (error) {
+            console.error(`Error adding plate to ${type}:`, error);
+            alert(`Failed to add plate: ${error.message}`);
+        }
+    }
+
+    async function deletePlate(type, plate) {
+        try {
+            const res = await fetch(`/auth-lists/${type}/${encodeURIComponent(plate)}`, {
+                method: 'DELETE'
+            });
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.detail || 'Failed to delete plate');
+            }
+            fetchAuthLists();
+        } catch (error) {
+            console.error(`Error deleting plate from ${type}:`, error);
+            alert(`Failed to delete plate: ${error.message}`);
+        }
+    }
 
 
 </script>

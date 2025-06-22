@@ -1,0 +1,15 @@
+<div class="sidebar-profile">
+    <div class="profile-info">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+            aria-hidden="true" class="profile-icon">
+            <circle cx="12" cy="7" r="4" />
+            <path d="M5.5 21a7 7 0 0 1 13 0" />
+        </svg>
+        <span class="username">{{ session.get('username', 'User') }}</span>
+    </div>
+    <form method="POST" action="{{ url_for('logout') }}">
+        <button type="submit" class="logout-btn" title="Logout">
+            Logout
+        </button>
+    </form>
+</div>

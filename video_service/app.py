@@ -61,17 +61,21 @@ def process_video(video_path_or_stream: str):
 
         frame = handler.decode_frame()
         if frame is None:
-            time.sleep(0.1)
             if time.time() - last_frame_time > timeout:
                 print("Timeout reached, stopping stream processing.")
                 break
+            time.sleep(0.001)  # Prevent tight spinning
             continue
 
         last_frame_time = time.time()
         push_frame_to_redis(frame, redis_client)
 
+        # Sleep to match target FPS
+        time.sleep(1 / handler.target_fps)
+
     handler.release_resources()
     print("Finished processing video.")
+
 
 @app.post("/start-video")
 def start_video(input: VideoInput):
@@ -128,24 +132,31 @@ def restart_video():
 
 @app.post("/skip-10s")
 def skip_10_seconds():
-    """Skips up to 10 seconds of video by calling the edge service."""
+    """Skips up to 10 seconds of video by coordinating with the edge service."""
     handler = state.get("handler")
     if handler is None:
         return {"message": "No active video handler"}
 
     try:
-        # Request edge service to skip as much as it can (max 10s)
+        # Ask edge-service to drop at most 40 frames (10 seconds)
         response = requests.get("http://edge_service:8000/skip-at-most-ten", timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            seconds_skipped = data.get("seconds_skipped", 0)
-        else:
-            return {"message": "Failed to skip frames"}
-    except Exception as e:
-        return {"message": f"Error calling skip-at-most-ten: {e}"}
+        response.raise_for_status()
+        data = response.json()
+        seconds_skipped = data.get("seconds_skipped")
 
-    handler.seek(10 - seconds_skipped)  # Skip the rest locally
-    return {"message": "10 seconds skipped."}
+        if seconds_skipped is None:
+            return {"message": "Invalid response from edge-service"}
+    except Exception as e:
+        return {"message": f"Error calling edge-service: {e}"}
+
+    # Handle local skip (e.g., when playing back a saved video)
+    try:
+        handler.seek(10 - seconds_skipped)
+    except Exception as e:
+        return {"message": f"Error seeking video: {e}"}
+
+    return {"message": f"Skipped ~10s (edge skipped {seconds_skipped}s, local skipped {10 - seconds_skipped}s)"}
+
 
 @app.post("/save-video")
 async def save_video(video: UploadFile = File(...)):

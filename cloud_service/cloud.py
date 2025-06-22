@@ -2,8 +2,10 @@ import cv2
 import numpy as np
 import paddleocr
 import util
-from formats import process_plate
+from formats import PlateFormatService
+from auth_manager import AuthManager
 import os
+import re
 
 class CloudService:
     """
@@ -16,6 +18,8 @@ class CloudService:
         Initialize the PaddleOCR model with predefined configurations and model paths.
         """
         self.active = False
+        self.formats = PlateFormatService()
+        self.auth_manager = AuthManager()
         self.reader = paddleocr.PaddleOCR(
             use_angle_cls=True,
             lang='en',
@@ -52,7 +56,7 @@ class CloudService:
         text, conf = self.read_text_from_plate(plate_img)
         print(text)
 
-        processed_plate = process_plate(text) if text else None
+        processed_plate = self.formats.process_plate(text) if text else None
         print(processed_plate)
 
         if not processed_plate:
@@ -116,3 +120,59 @@ class CloudService:
         except Exception as e:
             print(f"OCR error: {e}")
             return None, 0.0
+        
+
+        # Format management methods
+    def get_formats(self) -> dict:
+        return self.formats.get_formats()
+
+    def add_format(self, name: str, pattern: str) -> bool:
+        if name in self.formats.get_formats():
+            return False  # duplicate
+        try:
+            re.compile(pattern)  # Validate regex
+        except re.error:
+            return False
+        self.formats.add_format(name, pattern)
+        return True
+
+    def delete_format(self, name: str) -> bool:
+        if name not in self.formats.get_formats():
+            return False
+        self.formats.delete_format(name)
+        return True
+
+    def get_authorization_lists(self):
+        """Return whitelist and blacklist as dict."""
+        return {
+            "whitelist": self.auth_manager.white_list,
+            "blacklist": self.auth_manager.black_list,
+        }
+
+    def check_plate_authorization(self, plate: str) -> int:
+        """Return authorization status of plate."""
+        return self.auth_manager.get_vehicle_authorization(plate)
+
+    def add_to_whitelist(self, plate: str) -> bool:
+        if plate not in self.auth_manager.white_list:
+            self.auth_manager.add_whitelisted_plate(plate)
+            return True
+        return False
+
+    def add_to_blacklist(self, plate: str) -> bool:
+        if plate not in self.auth_manager.black_list:
+            self.auth_manager.add_blacklisted_plate(plate)
+            return True
+        return False
+
+    def remove_from_whitelist(self, plate: str) -> bool:
+        if plate in self.auth_manager.white_list:
+            self.auth_manager.white_list.remove(plate)
+            return True
+        return False
+
+    def remove_from_blacklist(self, plate: str) -> bool:
+        if plate in self.auth_manager.black_list:
+            self.auth_manager.black_list.remove(plate)
+            return True
+        return False

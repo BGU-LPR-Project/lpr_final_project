@@ -1,19 +1,30 @@
 <div id="main" class="tab-content active">
     <div class="panel">
-        <div class="stream-box" role="region" aria-label="Live Camera Stream">
-            <img src="{{ url_for('video_feed') }}" alt="Live Feed"
-                onerror="this.style.display='none'; this.parentElement.innerHTML='<p class=\'placeholder\'>Waiting for frames...</p>';" />
+        <div class="stream-box" role="region" aria-label="Live Camera Stream"
+            style="text-align: center; position: relative;">
+            <!-- MJPEG Live Stream Image -->
+            <img id="liveStreamImg" alt="Live Feed" style="display:none; max-width: 100%;" />
+
+            <!-- Placeholder for messages + spinner -->
+            <div id="placeholder" style="color: gray; font-style: italic; user-select: none;">
+                <div id="startSpinner"
+                    style="display: none; margin: 0 auto 8px auto; width: 24px; height: 24px; border: 3px solid #888; border-top: 3px solid white; border-radius: 50%; animation: spin 1s linear infinite;">
+                </div>
+                <p id="placeholderText">Waiting for stream to start...</p>
+            </div>
         </div>
+
         <div class="controls" role="toolbar" aria-label="Video Controls"
             style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
 
             <!-- Button Group (Left-Aligned) -->
             <div class="button-group" style="display: flex; gap: 0.5rem;">
-                <button onclick="callApi('/start-video')" title="Start Stream">
+                <button id="startBtn" title="Start Stream" style="display: flex; align-items: center; gap: 0.5rem;">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2"
                         viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M5 3v18l15-9z" />
-                    </svg> Start
+                    </svg>
+                    Start
                 </button>
                 <button onclick="callApi('/pause-video')" title="Pause Stream">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2"
@@ -71,3 +82,15 @@
         </div>
     </div>
 </div>
+
+<style>
+    @keyframes spin {
+        0% {
+            transform: rotate(0deg);
+        }
+
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+</style>

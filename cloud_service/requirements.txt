@@ -8,3 +8,4 @@ paddlepaddle==2.6.2
 fastapi
 uvicorn
 pydantic
+requests

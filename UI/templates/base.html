@@ -4,7 +4,13 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{% block title %}LPR System{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@600;700&display=swap" rel="stylesheet" />
+
+    <link rel="icon" href="{{ url_for('static', filename='lpr_icon.png') }}" type="image/png" />
+
+    <title>
+        {% block title %}Dashboard{% endblock %}
+    </title>
 
     <style>
         :root {
@@ -43,13 +49,68 @@
             padding: 20px 0;
         }
 
-        .sidebar h1 {
-            font-size: 20px;
-            color: var(--accent);
+        .sidebar-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
             padding: 0 20px 16px;
             margin: 0;
+            color: var(--accent);
+            font-family: 'Lato', 'Segoe UI', sans-serif;
+            font-weight: 800;
+            font-size: 25px;
             border-bottom: 1px solid var(--border);
-            font-weight: 700;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+
+            /* Add shadow under the bottom border */
+            box-shadow: 0 2px 4px rgba(66, 64, 64, 0.6);
+            margin-bottom: 4px;
+            /* space from title */
+        }
+
+        .sidebar-icon-img {
+            width: 32px;
+            /* Adjust icon size */
+            height: auto;
+        }
+
+        .sidebar-profile {
+            margin-top: auto;
+            padding: 15px 20px;
+            border-top: 1px solid var(--border);
+            color: var(--fg);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .profile-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .profile-icon {
+            width: 24px;
+            height: 24px;
+        }
+
+        .logout-btn {
+            background: var(--button-bg);
+            border: none;
+            color: var(--fg);
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.25s;
+            font-weight: 600;
+        }
+
+        .logout-btn:hover {
+            background-color: var(--button-hover-bg);
+            color: var(--button-hover-color);
         }
 
         /* Smaller, tighter sidebar buttons */
@@ -57,35 +118,44 @@
             background: none;
             border: none;
             color: var(--fg);
-            padding: 8px 16px;
-            /* reduced padding */
+            padding: 10px 20px;
+            /* Slightly more padding for comfort */
             text-align: left;
             cursor: pointer;
-            font-size: 14px;
-            /* smaller font */
+            font-size: 15px;
+            /* Slightly larger font for readability */
             width: 100%;
             display: flex;
             align-items: center;
-            gap: 8px;
-            /* smaller gap between icon and text */
-            transition: background-color 0.25s, color 0.25s;
+            gap: 12px;
+            /* A little more gap between icon and text */
+            transition: background-color 0.3s, color 0.3s;
+            /* Smoother transition */
             font-weight: 600;
             border-left: 4px solid transparent;
+            border-radius: 6px;
+            /* Soft rounded corners */
+            margin-bottom: 8px;
+            /* More breathing room between buttons */
         }
 
         /* Smaller icons inside sidebar buttons */
         .tab-btn svg {
-            width: 18px;
-            height: 18px;
+            width: 20px;
+            /* Slightly bigger icon */
+            height: 20px;
             stroke-width: 2;
             flex-shrink: 0;
         }
 
+        /* Active and hover states */
         .tab-btn.active,
         .tab-btn:hover {
             background-color: var(--card-hover);
             color: var(--accent);
             border-left-color: var(--accent);
+            box-shadow: 2px 0 6px var(--accent);
+            /* subtle glow on left border */
         }
 
         /* Main content */
@@ -97,6 +167,7 @@
             overflow-y: auto;
         }
 
+        /* Tabs content */
         .tab-content {
             display: none;
             flex-grow: 1;
@@ -106,6 +177,7 @@
         .tab-content.active {
             display: flex;
         }
+
 
         /* Panels */
         .panel {
@@ -193,9 +265,14 @@
 </head>
 
 <body>
-    <div class="sidebar">
-        <h1>LPR System</h1>
+    <div class=" sidebar">
+
+        <h1 class="sidebar-title">
+            <img src="{{ url_for('static', filename='lpr_icon.png') }}" alt="LPR Icon" class="sidebar-icon-img">
+            <span>LPR System</span>
+        </h1>
         {% include 'sidebar.html' %}
+        {% include 'sidebar_profile.html' %}
     </div>
 
     <main class="main-area">
@@ -211,9 +288,26 @@
             btn.addEventListener("click", () => {
                 tabs.forEach(b => b.classList.remove("active"));
                 contents.forEach(c => c.classList.remove("active"));
+
                 btn.classList.add("active");
-                document.getElementById(btn.dataset.tab).classList.add("active");
-            });
+                const activeContent = document.getElementById(btn.dataset.tab);
+                activeContent.classList.add("active");
+
+                // Trigger special action for formats tab
+                if (btn.dataset.tab === "formats") {
+                    fetchFormats();
+                }
+
+                // Load video list only once on live feed tab click
+                if (btn.dataset.tab === "main") {
+                    fetchVideoList();
+                }
+
+                // Handle authorization tab
+                if (btn.dataset.tab === "authorization") {
+                    fetchAuthLists();
+                }
+            })
         });
 
         // API call helper

@@ -1,0 +1,165 @@
+<div id="authorization" class="tab-content">
+    <style>
+        #authorization {
+            padding: 2rem;
+            color: #eee;
+        }
+
+        .auth-header {
+            margin-bottom: 2rem;
+        }
+
+        .section-title {
+            font-size: 1.75rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .section-subtitle {
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+
+        .auth-container {
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .auth-block {
+            background-color: #1e1e1e;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            flex: 1;
+            min-width: 300px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .auth-title {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            color: #ccc;
+        }
+
+        .auth-input-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .auth-input {
+            flex: 1;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            border: none;
+            background: #2a2a2a;
+            color: #fff;
+        }
+
+        .auth-btn {
+            padding: 0.5rem 1rem;
+            background: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .auth-btn:hover {
+            background: #45a045;
+        }
+
+        .auth-btn.danger {
+            background: #e53935;
+        }
+
+        .auth-btn.danger:hover {
+            background: #d32f2f;
+        }
+
+        .auth-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            flex-grow: 1;
+            height: 350px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .auth-list li {
+            background: #2b2b2b;
+            border-radius: 0.4rem;
+            padding: 0.5rem 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #ddd;
+        }
+
+        .auth-list li button {
+            background: #555;
+            color: #ccc;
+            border: none;
+            cursor: pointer;
+            padding: 0.3rem 0.6rem;
+            border-radius: 3px;
+            font-size: 1rem;
+        }
+
+        /* Dark custom scrollbar */
+        .auth-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .auth-list::-webkit-scrollbar-track {
+            background: #1e1e1e;
+            border-radius: 4px;
+        }
+
+        .auth-list::-webkit-scrollbar-thumb {
+            background-color: #444;
+            border-radius: 4px;
+        }
+
+        .auth-list::-webkit-scrollbar-thumb:hover {
+            background-color: #666;
+        }
+
+        .auth-list {
+            scrollbar-width: thin;
+            scrollbar-color: #444 #1e1e1e;
+        }
+    </style>
+
+    <div class="auth-header">
+        <h2 class="section-title">Authorization Management</h2>
+        <p class="section-subtitle">Manage whitelisted and blacklisted license plates</p>
+    </div>
+
+    <div class="auth-container">
+        <!-- Whitelist -->
+        <div class="auth-block">
+            <h3 class="auth-title">Whitelist</h3>
+            <div class="auth-input-group">
+                <input type="text" id="whitelistInput" placeholder="Enter license plate..." class="auth-input" />
+                <button class="auth-btn" onclick="addPlate('whitelist')">Add</button>
+            </div>
+            <ul id="whitelistList" class="auth-list"></ul>
+        </div>
+
+        <!-- Blacklist -->
+        <div class="auth-block">
+            <h3 class="auth-title">Blacklist</h3>
+            <div class="auth-input-group">
+                <input type="text" id="blacklistInput" placeholder="Enter license plate..." class="auth-input" />
+                <button class="auth-btn danger" onclick="addPlate('blacklist')">Add</button>
+            </div>
+            <ul id="blacklistList" class="auth-list"></ul>
+        </div>
+    </div>
+</div>
