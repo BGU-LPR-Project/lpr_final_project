@@ -6,6 +6,7 @@ import requests
 import time
 from auth_utils import verify_credentials
 import os
+import json
 
 app = Flask(__name__)
 r = redis.Redis(host='localhost', port=6379, db=0)
@@ -20,16 +21,14 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-
-        if verify_credentials(username, password):
+        role = verify_credentials(username, password)
+        if role:
             session['username'] = username
+            session['role'] = role
             session['logged_in'] = True
             return redirect(url_for('home'))
-        else:
-            return render_template('login.html', error="Invalid credentials")
-    else:
-        # GET request: just show login form
-        return render_template('login.html')
+        return render_template('login.html', error="Invalid credentials")
+    return render_template('login.html')
 
 @app.route('/logout', methods=['GET', 'POST'])
 def logout():
@@ -82,6 +81,20 @@ def generate():
 def video_feed():
     # MJPEG video stream
     return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route("/get-detections")
+def get_detections():
+    detections = []
+
+    while r.llen('DETECTIONS') > 0:
+        item = r.lpop('DETECTIONS')
+        if item:
+            try:
+                detections.append(json.loads(item))
+            except Exception as e:
+                print("Failed to load JSON:", e)
+
+    return jsonify(detections)
 
 @app.route('/auth-lists', methods=['GET'])
 def get_auth_lists():

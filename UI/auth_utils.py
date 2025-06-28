@@ -2,33 +2,27 @@ import json
 from pathlib import Path
 from werkzeug.security import check_password_hash
 
-# Define the correct path to the user data file
 USER_DATA_PATH = Path(__file__).parent / "data" / "user.dat"
 
-def load_user(filepath=USER_DATA_PATH):
+def load_users(filepath=USER_DATA_PATH):
     """
-    Load user credentials from a JSON file.
-
-    :param filepath: Path to the user data file
-    :return: Tuple of (username, password_hash)
+    Loads all users and their credentials from the JSON file.
+    :return: List of user dicts
     """
     with open(filepath, "r") as f:
         data = json.load(f)
-    return data["username"], data["password_hash"]
+    return data.get("users", [])
 
 def verify_credentials(input_username, input_password, filepath=USER_DATA_PATH):
     """
-    Verifies username and password against stored hash.
-
-    :param input_username: Username entered by user
-    :param input_password: Password entered by user
-    :param filepath: Path to user data file
-    :return: True if credentials match, else False
+    Verifies credentials and returns role if correct.
+    :return: User role if valid, otherwise None
     """
     try:
-        username, password_hash = load_user(filepath)
-        if input_username == username and check_password_hash(password_hash, input_password):
-            return True
+        users = load_users(filepath)
+        for user in users:
+            if user["username"] == input_username and check_password_hash(user["password_hash"], input_password):
+                return user["role"]
     except Exception as e:
         print(f"[ERROR] Failed to verify credentials: {e}")
-    return False
+    return None

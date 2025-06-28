@@ -522,6 +522,97 @@
         }
     }
 
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchVideoList();
+    });
+
+
+    let detectionCount = 0;
+    let detectionInterval = null; // store interval ID
+
+    const seenDetections = new Set();
+
+    async function pollDetections() {
+        try {
+            const res = await fetch('/get-detections');
+            if (!res.ok) return;
+
+            const detections = await res.json();
+            if (!Array.isArray(detections) || detections.length === 0) return;
+
+            const tbody = document.getElementById("detectionTableBody");
+            if (!tbody) return;
+
+            const newRows = [];
+
+            detections.forEach(det => {
+                const key = `${det.plate}_${det.timestamp.slice(0, 16)}`; // Unique by minute
+                if (seenDetections.has(key)) return;
+                seenDetections.add(key);
+
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                <td style="padding: 0.6rem 1rem; text-align: left;">${det.plate}</td>
+                <td style="padding: 0.6rem 1rem; text-align: center;">
+                    ${det.authorized === 1 ? "✅ Authorized" : det.authorized === -1 ? "❌ Unauthorized" : "❓ Unknown"}
+                </td>
+                <td style="padding: 0.6rem 1rem; text-align: center;">
+                    <img src="data:image/jpeg;base64,${det.image}" alt="Cropped Vehicle" style="height: 48px; border-radius: 4px;" />
+                </td>
+                <td style="padding: 0.6rem 1rem; font-size: 0.85rem; color: #aaa; text-align: center;">${det.timestamp}</td>
+            `;
+                newRows.push(row);
+            });
+
+            if (newRows.length > 0) {
+                detectionCount += newRows.length;
+                newRows.reverse().forEach(row => tbody.prepend(row)); // Prepend newest first
+
+                const badge = document.getElementById("detection-badge");
+                if (badge) {
+                    badge.textContent = detectionCount;
+                    badge.style.display = 'inline-block';
+                }
+            }
+
+        } catch (err) {
+            console.error("[pollDetections] Error:", err);
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const detectionTabBtn = document.querySelector('button[data-tab="detections"]');
+        const badge = document.getElementById("detection-badge");
+        const startBtn = document.getElementById("startBtn");
+
+        if (detectionTabBtn) {
+            detectionTabBtn.addEventListener("click", () => {
+                detectionCount = 0;
+                if (badge) {
+                    badge.textContent = '';
+                    badge.style.display = 'none';
+                }
+            });
+        }
+
+        if (startBtn) {
+            startBtn.addEventListener("click", () => {
+                if (!detectionInterval) {
+                    detectionInterval = setInterval(pollDetections, 5000);
+                }
+            });
+        }
+
+        window.addEventListener("beforeunload", () => {
+            if (detectionInterval) {
+                clearInterval(detectionInterval);
+                detectionInterval = null;
+            }
+        });
+    });
+
+
+
 
 </script>
 {% endblock %}

@@ -10,7 +10,8 @@ import utils
 from bounding_box import BoundingBox
 import redis
 import pickle
-
+import base64
+from collections import Counter
 
 class MotionDetector:
     """
@@ -39,8 +40,8 @@ class MotionDetector:
         # Convert current frame to grayscale
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # If no previous frame, store current and return no motion
-        if self.prev_frame is None:
+        # If no previous frame or resolution mismatch, reset
+        if self.prev_frame is None or self.prev_frame.shape != gray.shape:
             self.prev_frame = gray
             return []
 
@@ -246,29 +247,64 @@ class EdgeService:
 
         return vertically_aligned and horizontally_aligned
 
-    def update_tracked_vehicle(self, vehicle_id, ocr_text, ocr_confidence, frame):
+    from collections import Counter
+
+    def update_tracked_vehicle(self, vehicle_id, ocr_text, ocr_confidence, frame, on_detection_done=None):
         """
         Update tracked vehicle info with new OCR plate text and confidence.
-        Increments occurrence count if plate text matches previous; marks done if stable.
+        Uses majority voting from last 3 OCR results to stabilize detection.
+        Calls on_detection_done callback once if vehicle is marked done.
         """
         vehicle = self.tracker.objects[vehicle_id]
-        prev_text = vehicle["plate_number"]
-        prev_conf = vehicle["confidence"]
-        occurs = vehicle["occurs"]
+
+        # Initialize sliding OCR history and notified flag if missing
+        if "ocr_history" not in vehicle:
+            vehicle["ocr_history"] = []
+        if "notified" not in vehicle:
+            vehicle["notified"] = False
+
         bbox = vehicle["bbox"]
+        prev_conf = vehicle["confidence"]
 
         if ocr_text and ocr_confidence >= prev_conf:
-            is_same_text = (ocr_text == prev_text)
+            vehicle["ocr_history"].append(ocr_text)
+            if len(vehicle["ocr_history"]) > 3:
+                vehicle["ocr_history"].pop(0)
+
+            # Majority vote on last 3 OCR results
+            count = Counter(vehicle["ocr_history"])
+            most_common_text, freq = count.most_common(1)[0]
+
+            is_stable = freq >= 2  # majority out of 3
 
             vehicle.update({
-                "plate_number": ocr_text,
+                "plate_number": most_common_text,
                 "confidence": ocr_confidence,
                 "last_timestamp": datetime.now(),
-                "occurs": occurs + 1 if is_same_text else 0,
-                "direction": self.region_adjuster.is_in_entrance_or_exit(bbox, frame)
+                "direction": self.region_adjuster.is_in_entrance_or_exit(bbox, frame),
+                "done": is_stable
             })
-            vehicle["done"] = vehicle["occurs"] >= 2
-            self.tracker.update_tracked_plate(vehicle_id, ocr_text)
+
+            self.tracker.update_tracked_plate(vehicle_id, most_common_text)
+
+            if vehicle["done"] and not vehicle["notified"] and on_detection_done:
+                vehicle["notified"] = True
+
+                x1, y1, x2, y2 = bbox
+                cropped_img = frame[y1:y2, x1:x2]
+                _, buffer = cv2.imencode('.jpg', cropped_img)
+                encoded_img = base64.b64encode(buffer).decode('ascii')
+
+                detection_data = {
+                    "plate": most_common_text,
+                    "authorized": self.get_auth_status(most_common_text),
+                    "image": encoded_img,
+                    "timestamp": vehicle["last_timestamp"].strftime("%Y-%m-%d %H:%M:%S"),
+                    "direction": vehicle["direction"],
+                    "vehicle_id": vehicle_id
+                }
+
+                on_detection_done(detection_data)
 
     def log_results(self):
         """

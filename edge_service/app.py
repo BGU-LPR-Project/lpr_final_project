@@ -9,9 +9,10 @@ import uvicorn
 import logging
 from fastapi import FastAPI, Request, HTTPException
 from edge import EdgeService
-from queue import Queue, Empty, Full
+from queue import Queue, Empty
 from itertools import count
 import concurrent.futures
+import json
 
 VISUAL_FRAME_QUEUE = "visual_frame_queue"
 
@@ -68,6 +69,23 @@ def call_ocr(encoded_plate):
         logging.warning(f"OCR request failed: {e}")
         return None
 
+def stop_video_if_visual_queue_stuck():
+    MAX_QUEUE_SIZE = 15
+    VIDEO_SERVICE_STOP_URL = "http://video_service:8000/stop-video"
+
+    queue_size = redis_client.llen(VISUAL_FRAME_QUEUE)
+    if queue_size >= MAX_QUEUE_SIZE:
+        print(f"[WARN] Queue size reached {queue_size}, triggering stop-video.")
+        try:
+            response = requests.post(VIDEO_SERVICE_STOP_URL)
+            print(f"[INFO] stop-video response: {response.status_code} - {response.json()}")
+        except requests.RequestException as e:
+            print(f"[ERROR] Could not reach video_service: {e}")
+        return True
+    return False
+
+def push_detection_to_redis(detection):
+    redis_client.rpush('DETECTIONS', json.dumps(detection))
 
 def process_frame(seq, frame, edge_service):
     logging.info(f"Processing frame {seq} in worker thread.")
@@ -91,7 +109,7 @@ def process_frame(seq, frame, edge_service):
 
             if cloud_response:
                 ocr_text, ocr_conf = cloud_response.get("ocr_result", ("", 0.0))
-                edge_service.update_tracked_vehicle(object_id, ocr_text, ocr_conf, frame)
+                edge_service.update_tracked_vehicle(object_id, ocr_text, ocr_conf, frame, push_detection_to_redis)
             else:
                 logging.warning(f"No OCR response for frame {seq}, object {object_id}")
 
@@ -101,9 +119,9 @@ def process_frame(seq, frame, edge_service):
         except Exception as e:
             logging.error(f"Cloud predict API failed: {e}")
 
-    annotated_frame = edge_service.visualize(frame)
-    redis_client.rpush(VISUAL_FRAME_QUEUE, pickle.dumps((seq, annotated_frame)))
-
+    if not stop_video_if_visual_queue_stuck():
+        annotated_frame = edge_service.visualize(frame)
+        redis_client.rpush(VISUAL_FRAME_QUEUE, pickle.dumps((seq, annotated_frame)))
 
 def poll_queue(redis_client, edge_service):
     """Continuously polls Redis for new frames and enqueues them with sequence number."""

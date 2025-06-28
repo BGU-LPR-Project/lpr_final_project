@@ -47,13 +47,25 @@
                         <path d="M23 20v-6h-6" />
                     </svg> Restart
                 </button>
+                {% if session.get('role') == 'admin' %}
                 <button onclick="callApi('/skip-10s')" title="Skip 10 Seconds">
+                    <!-- SVG icon -->
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2"
                         viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M4 4l10 8-10 8V4z" />
                         <path d="M14 4l6 8-6 8V4z" />
                     </svg> +10s
                 </button>
+                {% else %}
+                <button class="disabled-button" disabled title="admin only feature"
+                    style="opacity: 0.5; cursor: default;">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2"
+                        viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 4l10 8-10 8V4z" />
+                        <path d="M14 4l6 8-6 8V4z" />
+                    </svg> +10s
+                </button>
+                {% endif %}
             </div>
 
             <!-- Video selector dropdown -->
@@ -65,17 +77,41 @@
             </div>
 
             <!-- Upload Form (Right-Aligned) -->
-            <form id="uploadForm" enctype="multipart/form-data" onsubmit="upload_video(event)"
-                style="display: flex; align-items: center; gap: 0.5rem;">
-                <label for="videoUpload" title="Upload a Video" style="cursor: pointer;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                {% if session.get('role') == 'admin' %}
+                <form id="uploadForm" enctype="multipart/form-data" onsubmit="upload_video(event)"
+                    style="display: flex; align-items: center; gap: 0.5rem;">
+                    <!-- Upload icon label -->
+                    <label for="videoUpload" title="Upload a Video" style="cursor: pointer;">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24" aria-hidden="true" style="width: 20px; height: 20px;">
+                            <path d="M4 16v1a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1M12 12V4m0 0L8 8m4-4 4 4" />
+                        </svg>
+                    </label>
+
+                    <!-- File input -->
+                    <input type="file" id="videoUpload" name="video" accept="video/*" style="display: none;" required>
+
+                    <!-- Submit button -->
+                    <button type="submit" title="Upload Video" style="font-size: 0.9rem;">Upload</button>
+                </form>
+                {% else %}
+                <!-- Disabled version for non-admins -->
+                <div style="display: flex; align-items: center; gap: 0.5rem; opacity: 0.5; cursor: default;"
+                    title="admin only feature">
+                    <!-- Disabled upload icon -->
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2"
                         viewBox="0 0 24 24" aria-hidden="true" style="width: 20px; height: 20px;">
                         <path d="M4 16v1a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1M12 12V4m0 0L8 8m4-4 4 4" />
                     </svg>
-                </label>
-                <input type="file" id="videoUpload" name="video" accept="video/*" style="display: none;" required>
-                <button type="submit" title="Upload Video" style="font-size: 0.9rem;">Upload</button>
-            </form>
+
+                    <!-- Disabled button -->
+                    <button disabled style="font-size: 0.9rem; cursor: default;" class="disabled-button">Upload</button>
+                </div>
+                {% endif %}
+            </div>
+
+
         </div>
         <div>
             <span id="uploadStatus" style="font-size: 0.85rem; color: gray; margin-left: 0.5rem;"></span>
@@ -92,5 +128,15 @@
         100% {
             transform: rotate(360deg);
         }
+    }
+
+    .disabled-button:hover,
+    .disabled-button:hover * {
+        background-color: inherit !important;
+        color: inherit !important;
+        /* border-color: inherit !important; */
+        cursor: default !important;
+        box-shadow: none !important;
+        text-decoration: none !important;
     }
 </style>
